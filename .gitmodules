@@ -1,0 +1,4 @@
+[submodule "submodules/pytak"]
+	path = submodules/pytak
+	url = git@github.com:jwdinius/pytak.git
+	branch = resolve-issues-with-tests

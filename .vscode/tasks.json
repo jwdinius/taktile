@@ -1,0 +1,42 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Run pytak unit tests",
+            "type": "shell",
+            "command": "pytest submodules/pytak/tests",
+        },
+        {
+            "label": "Configure taktile",
+            "type": "shell",
+            "command": "cmake -S . -B build",
+        },
+        {
+            "label": "Build taktile",
+            "type": "shell",
+            "command": "cmake --build build",
+            "dependsOn": "Configure taktile",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+                "$gcc"
+            ]
+        },
+        {
+            "label": "Run taktile tests",
+            "type": "shell",
+            "command": "ctest --test-dir build/tests --output-on-failure",
+            "dependsOn": "Build taktle",
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        }
+    ]
+}
