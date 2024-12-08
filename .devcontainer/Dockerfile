@@ -22,6 +22,7 @@ RUN apt-get update && apt-get install -y \
    kitware-archive-keyring \
    cmake \
    libboost-all-dev \
+   libpoco-dev \
    libgtest-dev
 
 # setup user env at the end

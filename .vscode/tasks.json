@@ -29,7 +29,7 @@
             "label": "Run taktile tests",
             "type": "shell",
             "command": "ctest --test-dir build/tests --output-on-failure",
-            "dependsOn": "Build taktle",
+            "dependsOn": ["Build taktile"],
             "group": {
                 "kind": "test",
                 "isDefault": true
