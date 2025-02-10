@@ -8,9 +8,9 @@ RUN apt-get update && apt-get install -y \
    ca-certificates \
    gnupg2 \
    wget
-RUN echo 'deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ jammy main' | tee /etc/apt/sources.list.d/kitware.list >/dev/null
-RUN test -f /usr/share/doc/kitware-archive-keyring/copyright || rm -f /usr/share/keyrings/kitware-archive-keyring.gpg
+RUN rm -f /usr/share/keyrings/kitware-archive-keyring.gpg
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc | gpg --dearmor -o /usr/share/keyrings/kitware-archive-keyring.gpg
+RUN echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ jammy main" | tee /etc/apt/sources.list.d/kitware.list > /dev/null
 
 RUN apt-get update && apt-get install -y \
    curl \
@@ -22,6 +22,7 @@ RUN apt-get update && apt-get install -y \
    kitware-archive-keyring \
    cmake \
    libboost-all-dev \
+   libfmt-dev \
    libpoco-dev \
    libgtest-dev
 

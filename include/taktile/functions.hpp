@@ -70,11 +70,25 @@ namespace taktile {
     /// @param _stale time in seconds before the message is considered stale
     /// @param _cot_type CoT type (non-empty string)
     /// @throws std::invalid_argument if any parameter is out of range
-    CotMessage(double _lat, double _lon, double _ce, double _hae, double _le, std::string _uid, uint32_t _stale, std::string _cot_type);
+    explicit CotMessage(double _lat, double _lon, double _ce, double _hae, double _le, std::string _uid, uint32_t _stale, std::string _cot_type);
+
+    explicit CotMessage(std::string _uid);
 
     /// @brief Convert the CoT message to an XML string
     /// @return XML string 
-    std::string to_xml() const;
+    std::string as_xml_string() const;
+
+    /// @brief Convert the CoT message to a byte array
+    /// @return byte array
+    std::vector<uint8_t> as_byte_array() const;
+
+    /// @brief Get the current time in W3C XML datetime format
+    /// @details Comparable to cot_time
+    /// @param stale_time time in seconds before the message is considered stale (optional)
+    /// @return 
+    static std::string get_time(std::optional<int32_t> stale_time = std::nullopt);
   };
+
+  CotMessage hello_event(std::optional<std::string> uid);
 
 } // namespace taktile
