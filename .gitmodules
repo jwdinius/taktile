@@ -2,3 +2,7 @@
 	path = submodules/pytak
 	url = git@github.com:jwdinius/pytak.git
 	branch = resolve-issues-with-tests
+[submodule "submodules/simpleio"]
+	path = submodules/simpleio
+	url = git@github.com:jwdinius/simpleio.git
+	branch = main
