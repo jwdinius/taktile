@@ -1,0 +1,5 @@
+#!/bin/bash
+clang-tidy $(find include/ src/ -type f \( \
+  -name '*.h' -o -name '*.hpp' -o \
+  -name '*.c' -o -name '*.cpp' -o -name '*.cc' -o -name '*.cxx' \
+\)) -p=build --extra-arg=-std=c++17 --config-file=.clang-tidy \

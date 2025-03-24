@@ -13,6 +13,9 @@ RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc | gpg --de
 RUN echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ jammy main" | tee /etc/apt/sources.list.d/kitware.list > /dev/null
 
 RUN apt-get update && apt-get install -y \
+   clang-format \
+   clang-tidy \
+   cppcheck \
    curl \
    python3 \
    python3-pip \
@@ -24,7 +27,12 @@ RUN apt-get update && apt-get install -y \
    libboost-all-dev \
    libfmt-dev \
    libpoco-dev \
-   libgtest-dev
+   libgtest-dev \
+   libmsgsl-dev \
+   llvm \
+   vim
+
+RUN python3 -m pip install pre-commit cpplint
 
 # setup user env at the end
 # -m option creates a fake writable home folder

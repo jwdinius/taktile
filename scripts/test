@@ -1,0 +1,2 @@
+#!/bin/bash
+ctest --test-dir build/tests --output-on-failure

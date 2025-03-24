@@ -5,12 +5,10 @@ target_sources(${PROJECT_NAME}
     functions.cpp  # List all your source files here
 )
 
-#target_link_libraries(my_app PRIVATE Poco::Foundation Poco::Net Poco::Util)
-
 target_link_libraries(${PROJECT_NAME}
   PRIVATE
-    Boost::system
+    Boost::log
+    Boost::log_setup
     fmt::fmt
-    Poco::Net
     Poco::XML
 )
