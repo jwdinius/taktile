@@ -19,11 +19,15 @@
 #include <boost/log/utility/setup/console.hpp>
 #include <chrono>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
+
+namespace siomsg = simpleio::messages;
 
 namespace taktile {
 
@@ -75,92 +79,38 @@ URL URL::parse_url(std::string const& inp) {
   return URL{scheme, uri.getHost(), uri.getSpecifiedPort()};
 }
 
-CotType::CotType(double _lat, double _lon, double _ce, double _hae,
-                       double _le, std::string _uid, uint32_t _stale,
-                       std::string _cot_type) {
-  if (_lat < -90.0 || _lat > 90.0) {
+void CotType::validate(CotType const& cot) {
+  if (cot.lat < -LATITUDE_BOUND || cot.lat > LATITUDE_BOUND) {
     throw std::invalid_argument("Latitude must be between -90 and 90 degrees");
-  } else if (_lon < -180 || _lon > 180) {
+  }
+  if (cot.lon < -LONGITUDE_BOUND || cot.lon > LONGITUDE_BOUND) {
     throw std::invalid_argument(
         "Longitude must be between -180 and 180 degrees");
-  } else if (_ce < 0) {
+  }
+  if (cot.ce < 0) {
     throw std::invalid_argument(
         "Circular Error must be greater than or equal to 0");
-  } else if (_hae < 0) {
+  }
+  if (cot.hae < 0) {
     throw std::invalid_argument(
         "Height Above Ellipsoid must be greater than or equal to 0");
-  } else if (_le < 0) {
+  }
+  if (cot.le < 0) {
     throw std::invalid_argument(
         "Linear Error must be greater than or equal to 0");
-  } else if (_uid.empty()) {
+  }
+  if (cot.uid.empty()) {
     throw std::invalid_argument("UID must not be empty");
-  } else if (_cot_type.empty()) {
+  }
+  if (cot.cot_type.empty()) {
     throw std::invalid_argument("CoT type must not be empty");
   }
-
-  lat = _lat;
-  lon = _lon;
-  ce = _ce;
-  hae = _hae;
-  le = _le;
-  uid = _uid;
-  stale = _stale;
-  cot_type = _cot_type;
 }
 
 CotType::CotType(std::string _uid)
-    : CotType{
-          0.0, 0.0, 0.0, 0.0, 0.0, _uid, DEFAULT_COT_STALE, DEFAULT_COT_TYPE} {}
-
-std::string CotType::as_xml_string() const {
-  // Create a local Document object
-  Poco::XML::AutoPtr<Poco::XML::Document> doc = new Poco::XML::Document();
-
-  // Create <event> element
-  Poco::XML::Element* event = doc->createElement("event");
-  event->setAttribute("version", "2.0");
-  event->setAttribute("type", cot_type);
-  event->setAttribute("uid", uid);
-  event->setAttribute("how", "m-g");
-  event->setAttribute("time", get_time());
-  event->setAttribute("start", get_time());
-  event->setAttribute("stale", get_time(stale));
-
-  // Create <point> element
-  Poco::XML::Element* point = doc->createElement("point");
-  point->setAttribute("lat", std::to_string(lat));
-  point->setAttribute("lon", std::to_string(lon));
-  point->setAttribute("le", std::to_string(le));
-  point->setAttribute("hae", std::to_string(hae));
-  point->setAttribute("ce", std::to_string(ce));
-
-  // Create <_flow-tags_> element
-  Poco::XML::Element* flow_tags = doc->createElement("_flow-tags_");
-  std::string _ft_tag = DEFAULT_HOST_ID + "-v" + std::string(VERSION);
-  std::replace(_ft_tag.begin(), _ft_tag.end(), '@', '-');
-  flow_tags->setAttribute(_ft_tag, get_time());
-
-  // Create <detail> element
-  Poco::XML::Element* detail = doc->createElement("detail");
-  detail->appendChild(flow_tags);
-
-  event->appendChild(point);
-  event->appendChild(detail);
-
-  // Attach <event> to document
-  doc->appendChild(event);
-
-  std::ostringstream oss;
-  Poco::XML::DOMWriter writer;
-  writer.setOptions(Poco::XML::XMLWriter::PRETTY_PRINT);
-  writer.writeNode(oss, doc);
-  return oss.str();
-}
-
-std::vector<uint8_t> CotType::as_byte_array() const {
-  auto xml = this->as_xml_string();
-  return std::vector<uint8_t>(xml.begin(), xml.end());
-}
+    : uid{std::move(_uid)},
+      stale{DEFAULT_COT_STALE},
+      cot_type{DEFAULT_COT_TYPE} {}
 
 std::string CotType::get_time(std::optional<int32_t> cot_stale) {
   auto time = std::chrono::system_clock::now();
@@ -173,18 +123,111 @@ std::string CotType::get_time(std::optional<int32_t> cot_stale) {
   return fmt::format(W3C_XML_DATETIME, seconds, milliseconds.count());
 }
 
-CotXmlSerializer::serialize() {
-  auto xml = entity.as_xml_string();
-  return std::vector<std::byte>(xml.begin(), xml.end());
+siomsg::XmlMessageType Cot2Xml::convert(CotType const& cot) {
+  // Create a local Document object
+  auto* doc = new Poco::XML::Document();
+
+  // Create <event> element
+  auto* event = doc->createElement("event");
+  event->setAttribute("version", "2.0");
+  event->setAttribute("type", cot.cot_type);
+  event->setAttribute("uid", cot.uid);
+  event->setAttribute("how", "m-g");
+  event->setAttribute("time", CotType::get_time());
+  event->setAttribute("start", CotType::get_time());
+  event->setAttribute("stale", CotType::get_time(cot.stale));
+
+  // Create <point> element
+  auto* point = doc->createElement("point");
+  point->setAttribute("lat", std::to_string(cot.lat));
+  point->setAttribute("lon", std::to_string(cot.lon));
+  point->setAttribute("le", std::to_string(cot.le));
+  point->setAttribute("hae", std::to_string(cot.hae));
+  point->setAttribute("ce", std::to_string(cot.ce));
+
+  // Create <_flow-tags_> element
+  auto* flow_tags = doc->createElement("_flow-tags_");
+  std::string _ft_tag = DEFAULT_HOST_ID + "-v" + std::string(VERSION);
+  std::replace(_ft_tag.begin(), _ft_tag.end(), '@', '-');
+  flow_tags->setAttribute(_ft_tag, CotType::get_time());
+
+  // Create <detail> element
+  auto* detail = doc->createElement("detail");
+  detail->appendChild(flow_tags);
+
+  event->appendChild(point);
+  event->appendChild(detail);
+
+  // Attach <event> to document
+  doc->appendChild(event);
+  return doc;
 }
 
-CotXmlSerializer::deserialize(std::vector<std::byte> const& _blob) {
-  std::string xml(_blob.begin(), _blob.end());
-  return CotType{0.0, 0.0, 0.0, 0.0, 0.0, "t-x-d-d", 0, "t-x-d-d"};
+CotType Cot2Xml::convert(siomsg::XmlMessageType const& xml) {
+  // Get the <event> element
+  if (xml == nullptr) {
+    throw std::invalid_argument("XML message is null.");
+  }
+  auto* event = xml->documentElement();
+  if (event == nullptr || event->nodeName() != "event") {
+    throw std::invalid_argument(
+        "Expected root-level <event> element not found.");
+  }
+
+  // Get the <point> element
+  auto* point = event->getChildElement("point");
+  if (point == nullptr) {
+    throw std::invalid_argument("Expected <point> element not found.");
+  }
+
+  // Get the <detail> element
+  // auto detail = event->getElementByTagName("detail");
+  // if (detail.isNull()) {
+  //  throw std::invalid_argument("No <detail> element found");
+  //}
+
+  auto uid = event->getAttribute("uid");
+  if (uid.empty()) {
+    throw std::invalid_argument("UID attribute is empty.");
+  }
+  auto cot = CotType(uid);
+
+  // Get the attributes
+  try {
+    cot.lat = std::stod(point->getAttribute("lat"));
+    cot.lon = std::stod(point->getAttribute("lon"));
+    cot.le = std::stod(point->getAttribute("le"));
+    cot.hae = std::stod(point->getAttribute("hae"));
+    cot.ce = std::stod(point->getAttribute("ce"));
+    cot.cot_type = event->getAttribute("type");
+    cot.stale = std::stoul(event->getAttribute("stale"));
+    CotType::validate(cot);
+    return cot;
+  } catch (std::invalid_argument const& e) {
+    throw std::invalid_argument("CoT validation failed: " +
+                                std::string(e.what()));
+  } catch (std::exception const& e) {
+    throw std::invalid_argument("Unable to parse: " + std::string(e.what()));
+  }
 }
 
-CotType hello_event(std::optional<std::string> uid) {
-  return CotType{0.0, 0.0,      0.0, 0.0, 0.0, uid.value_or("takPing"),
-                    0,   "t-x-d-d"};
+CotXmlSerializer::CotXmlSerializer(
+    std::shared_ptr<siomsg::XmlSerializer> strategy)
+    : xml_serializer_{std::move(strategy)} {}
+
+std::vector<std::byte> CotXmlSerializer::serialize(CotType const& entity) {
+  auto xml = Cot2Xml::convert(entity);
+  return xml_serializer_->serialize(xml);
+}
+
+CotType CotXmlSerializer::deserialize(std::vector<std::byte> const& _blog) {
+  auto xml = xml_serializer_->deserialize(_blog);
+  return Cot2Xml::convert(xml);
+}
+
+CotType hello_event(std::optional<std::string> const& uid) {
+  auto cot = CotType(uid.value_or("takPing"));
+  cot.cot_type = "t-x-d-d";
+  return cot;
 }
 }  // namespace taktile

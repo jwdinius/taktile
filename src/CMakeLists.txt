@@ -9,6 +9,4 @@ target_link_libraries(${PROJECT_NAME}
   PRIVATE
     Boost::log
     Boost::log_setup
-    fmt::fmt
-    Poco::XML
 )

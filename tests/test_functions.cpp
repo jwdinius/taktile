@@ -7,9 +7,11 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <memory>
 #include <regex>
-
 #include <simpleio/messages/xml.hpp>
+#include <utility>
+
 #include "taktile/functions.hpp"
 
 static std::regex const W3C_XML_DATETIME_REGEX(
@@ -17,12 +19,27 @@ static std::regex const W3C_XML_DATETIME_REGEX(
 
 /// Test that creating a cot message with arbitrary UID returns the expected
 /// values.
-static inline auto contains_substring([](std::vector<uint8_t> const& byte_array,
-                                         std::string_view const& sub_str) {
-  return std::search(byte_array.begin(), byte_array.end(), sub_str.begin(),
-                     sub_str.end()) != byte_array.end();
-});
+// static inline auto contains_substring(
+//     [](gsl::span<const std::byte> const& byte_array,
+//        std::string_view const& sub_str) {
+//       return std::search(byte_array.begin(), byte_array.end(),
+//       sub_str.begin(),
+//                          sub_str.end()) != byte_array.end();
+//     });
 
+/// Test that creating a cot message with arbitrary UID returns the expected
+/// values.
+/// Test that creating a CoT message with arbitrary UID returns the expected
+/// values.
+static inline auto contains_substring =
+    [](gsl::span<const std::byte> const& byte_array,
+       std::string_view const& sub_str) {
+      return std::search(byte_array.begin(), byte_array.end(),
+                         reinterpret_cast<const std::byte*>(sub_str.data()),
+                         reinterpret_cast<const std::byte*>(sub_str.data() +
+                                                            sub_str.size())) !=
+             byte_array.end();
+    };
 TEST(Functions, test_construct_cot_url_default) {
   /// Test case that checks default-constructed URL is the same as the default
   /// CoT URL
@@ -97,12 +114,13 @@ TEST(Functions, cot_message_get_time) {
   EXPECT_TRUE(std::regex_match(result, W3C_XML_DATETIME_REGEX));
 }
 
-TEST(Functions, cot_message_byte_array) {
+TEST(Functions, basic_cot_message) {
   auto const uid = "taco";
   auto cot = taktile::CotType(uid);
-  auto strategy = std::make_shared<simpleio::messages::XmlSerializer>();
-  auto cot_msg = taktile::CotMessage<taktile::MAX_UDP_BLOB_SIZE>(
-      std::move(cot), strategy);
+  auto strategy = std::make_shared<taktile::CotXmlSerializer>(
+      std::make_shared<simpleio::messages::XmlSerializer>());
+  auto cot_msg =
+      taktile::CotMessage<taktile::MAX_UDP_BLOB_SIZE>(std::move(cot), strategy);
 
   // Check that the byte array contains the expected UID ("uid=\"taco\"")
   std::string_view const expected_uid = fmt::format("uid=\"{}\"", uid);
@@ -117,9 +135,10 @@ TEST(Functions, cot_message_byte_array) {
 TEST(Functions, hello_event) {
   auto const uid = "taco";
   auto cot = taktile::hello_event(uid);
-  auto strategy = std::make_shared<simpleio::messages::XmlSerializer>();
-  auto cot_msg = taktile::CotMessage<taktile::MAX_UDP_BLOB_SIZE>(
-      std::move(cot), strategy);
+  auto strategy = std::make_shared<taktile::CotXmlSerializer>(
+      std::make_shared<simpleio::messages::XmlSerializer>());
+  auto cot_msg =
+      taktile::CotMessage<taktile::MAX_UDP_BLOB_SIZE>(std::move(cot), strategy);
 
   // Check that the byte array contains the expected UID ("uid=\"taco\"")
   std::string_view const expected_uid = fmt::format("uid=\"{}\"", uid);
@@ -133,19 +152,22 @@ TEST(Functions, hello_event) {
 
 TEST(Functions, cot2xml) {
   // Test that the CoT message is correctly converted to an XML document string.
-  auto const cot = taktile::CotType(37.7749, -122.4194, 10, 100, 5,
-                                           "test_uid", 3600, "a-f-G");
-  auto strategy = std::make_shared<simpleio::messages::XmlSerializer>();
-  auto cot_msg = taktile::CotMessage<taktile::MAX_UDP_BLOB_SIZE>(
-      std::move(cot), strategy);
-  auto doc = cot_msg.entity();
+  auto cot = taktile::CotType("test_uid");
+  cot.lat = 37.7749;
+  cot.lon = -122.4194;
+  cot.le = 10;
+  cot.hae = 100;
+  cot.ce = 5;
+  cot.cot_type = "a-f-G";
+  cot.stale = 3600;
+  auto doc = taktile::Cot2Xml::convert(cot);
   EXPECT_NE(doc, nullptr);
   auto root = doc->documentElement();
   EXPECT_NE(root, nullptr);
   EXPECT_EQ(root->nodeName(), "event");
   EXPECT_EQ(root->getAttribute("version"), "2.0");
-  EXPECT_EQ(root->getAttribute("type"), cot_msg.cot_type);
-  EXPECT_EQ(root->getAttribute("uid"), cot_msg.uid);
+  EXPECT_EQ(root->getAttribute("type"), cot.cot_type);
+  EXPECT_EQ(root->getAttribute("uid"), cot.uid);
   EXPECT_EQ(root->getAttribute("how"), "m-g");
   EXPECT_TRUE(
       std::regex_match(root->getAttribute("time"), W3C_XML_DATETIME_REGEX));
@@ -156,16 +178,11 @@ TEST(Functions, cot2xml) {
 
   auto point_element = root->getChildElement("point");
   EXPECT_NE(point_element, nullptr);
-  EXPECT_EQ(point_element->getAttribute("lat"),
-            fmt::format("{:.6f}", cot_msg.lat));
-  EXPECT_EQ(point_element->getAttribute("lon"),
-            fmt::format("{:.6f}", cot_msg.lon));
-  EXPECT_EQ(point_element->getAttribute("le"),
-            fmt::format("{:.6f}", cot_msg.le));
-  EXPECT_EQ(point_element->getAttribute("hae"),
-            fmt::format("{:.6f}", cot_msg.hae));
-  EXPECT_EQ(point_element->getAttribute("ce"),
-            fmt::format("{:.6f}", cot_msg.ce));
+  EXPECT_EQ(point_element->getAttribute("lat"), fmt::format("{:.6f}", cot.lat));
+  EXPECT_EQ(point_element->getAttribute("lon"), fmt::format("{:.6f}", cot.lon));
+  EXPECT_EQ(point_element->getAttribute("le"), fmt::format("{:.6f}", cot.le));
+  EXPECT_EQ(point_element->getAttribute("hae"), fmt::format("{:.6f}", cot.hae));
+  EXPECT_EQ(point_element->getAttribute("ce"), fmt::format("{:.6f}", cot.ce));
 
   auto detail_element = root->getChildElement("detail");
   EXPECT_NE(detail_element, nullptr);

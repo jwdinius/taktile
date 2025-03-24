@@ -3,12 +3,14 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <optional>
-#include <string>
-#include <vector>
-
 #include <simpleio/message.hpp>
 #include <simpleio/messages/xml.hpp>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "taktile/constants.hpp"
 
 namespace taktile {
@@ -24,7 +26,7 @@ class URL {
   std::string net_loc{DEFAULT_IPV4_ADDRESS};
   uint16_t port{DEFAULT_BROADCAST_PORT};
 
-  URL() = default; 
+  URL() = default;
   ~URL() = default;
   URL(URL const &) = default;
   URL(URL &&) = default;
@@ -47,7 +49,7 @@ class URL {
   /// @param inp
   /// @return url
   /// @throws std::invalid_argument if the scheme is not in SCHEME
-  URL parse_url(std::string const &inp);
+  static URL parse_url(std::string const &inp);
 };
 
 /// @brief Cursor-on-Target (CoT) message structure
@@ -69,88 +71,64 @@ struct CotType {
   CotType &operator=(CotType const &) = default;
   CotType &operator=(CotType &&) = default;
 
-  /// @brief Construct a CoT message with the given parameters
-  /// @param _lat latitude (-90 to 90 degrees)
-  /// @param _lon longitude (-180 to 180 degrees)
-  /// @param _ce circular error (>= 0)
-  /// @param _hae height above ellipsoid (>= 0)
-  /// @param _le linear error (>= 0)
-  /// @param _uid unique identifier (non-empty)
-  /// @param _stale time in seconds before the message is considered stale
-  /// @param _cot_type CoT type (non-empty string)
-  /// @throws std::invalid_argument if any parameter is out of range
-  explicit CotType(double _lat, double _lon, double _ce, double _hae,
-                      double _le, std::string _uid, uint32_t _stale,
-                      std::string _cot_type);
-
   explicit CotType(std::string _uid);
 
   /// @brief Get the current time in W3C XML datetime format
   /// @details Comparable to cot_time
-  /// @param stale_time time in seconds before the message is considered stale
+  /// @param cot_stale time in seconds before the message is considered stale
   /// (optional)
   /// @return
-  static std::string get_time(std::optional<int32_t> stale_time = std::nullopt);
+  static std::string get_time(std::optional<int32_t> cot_stale = std::nullopt);
+
+  static void validate(CotType const &cot);
 };
 
-class CotXml : public CotType {
-  CotXml() = default;
-  ~CotXml() override = default;
+class Cot2Xml {
+ public:
+  /// @brief Convert a CoT message to an XML message
+  /// @param cot
+  /// @return xml
+  static simpleio::messages::XmlMessageType convert(CotType const &cot);
 
-  CotXml(CotXml const &) = default;
-  CotXml(CotXml &&) = default;
-  CotXml &operator=(CotXml const &) = default;
-  CotXml &operator=(CotXml &&) = default;
-
-  // @throws std::invalid_argument if the XML message is invalid
-  explicit CotXml(simpleio::messages::XmlMessageType const& _xml);
-
-  explicit CotXml(CotType const& cot);
-
-private:
-  simpleio::messages::XmlMessageType xml_;
+  static CotType convert(simpleio::messages::XmlMessageType const &xml);
 };
 
 class CotSerializer : public simpleio::SerializationStrategy<CotType> {
  public:
-  ~CotSerializer() override = default;
+  std::vector<std::byte> serialize(CotType const &cot) override = 0;
 
-  std::vector<std::byte> serialize(CotType const &entity) override = 0;
-
-  CotType deserialize(std::vector<std::byte> const &_blob) override = 0;
+  CotType deserialize(std::vector<std::byte> const &xml) override = 0;
 };
 
 class CotXmlSerializer : public CotSerializer {
  public:
-  explicit CotXmlSerializer(std::shared_ptr<simpleio::messages::XmlSerializer> strategy)
-      : strategy_(std::move(strategy)) {}
-  std::vector<std::byte> serialize(CotXml const &entity) override;
+  explicit CotXmlSerializer(
+      std::shared_ptr<simpleio::messages::XmlSerializer> strategy);
 
-  CotXml deserialize(std::vector<std::byte> const &_blob) override;
+  std::vector<std::byte> serialize(CotType const &entity) override;
 
-private:
-  std::shared_ptr<simpleio::messages::XmlSerializer> strategy_;
+  CotType deserialize(std::vector<std::byte> const &_blog) override;
+
+ private:
+  std::shared_ptr<simpleio::messages::XmlSerializer> xml_serializer_;
 };
 
-
-/// @brief Represent CotType as an XML message
 template <size_t N>
 class CotMessage : public simpleio::Message<CotType, N> {
  public:
-
   CotMessage() = delete;
 
   ~CotMessage() override = default;
 
-  explicit CotMessage(CotType&& cot_type,
+  explicit CotMessage(CotType &&cot_type,
                       std::shared_ptr<CotSerializer> strategy)
       : simpleio::Message<CotType, N>(std::move(cot_type), strategy) {}
 
-  explicit CotMessage(std::vector<std::byte>&& _blob,
+  explicit CotMessage(std::vector<std::byte> &&_blob,
                       std::shared_ptr<CotSerializer> strategy)
       : simpleio::Message<CotType, N>(std::move(_blob), strategy) {}
 };
 
-CotType hello_event(std::optional<std::string> uid);
+CotType hello_event(std::optional<std::string> const &uid);
 
 }  // namespace taktile

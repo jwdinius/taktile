@@ -39,6 +39,8 @@ static constexpr double DEFAULT_COT_VAL{9999999.0};
 extern const std::string DEFAULT_HOST_ID;
 static const char* const DEFAULT_COT_TYPE{"a-u-G"};
 static const char* const W3C_XML_DATETIME{"{:%Y-%m-%dT%H:%M:%S}.{:03d}Z"};
-static constexpr size_t MAX_UDP_BLOB_SIZE{1400};
-static constexpr size_t MAX_TCP_BLOB_SIZE{64000};
+static constexpr size_t MAX_UDP_BLOB_SIZE{1400};  // # of bytes
+static constexpr size_t MAX_TCP_BLOB_SIZE{64000};  // # of bytes
+static constexpr double LATITUDE_BOUND{90.0};  // degrees
+static constexpr double LONGITUDE_BOUND{180.0};  // degrees
 }  // namespace taktile

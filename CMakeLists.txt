@@ -9,7 +9,6 @@ add_subdirectory(submodules/simpleio)
 
 find_package(Boost 1.74 REQUIRED COMPONENTS system log log_setup)
 find_package(Poco 1.11 REQUIRED COMPONENTS Net XML)
-find_package(fmt 8 REQUIRED)
 
 add_library(${PROJECT_NAME} SHARED)
 
