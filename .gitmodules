@@ -6,3 +6,7 @@
 	path = submodules/simpleio
 	url = git@github.com:jwdinius/simpleio.git
 	branch = main
+[submodule "submodules/AndroidTacticalAssaultKit-CIV"]
+	path = submodules/AndroidTacticalAssaultKit-CIV
+	url = git@github.com:deptofdefense/AndroidTacticalAssaultKit-CIV.git
+	branch = 4.6.0.5

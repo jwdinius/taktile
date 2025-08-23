@@ -2,35 +2,24 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "taktile/functions.hpp"
 
-#include <Poco/DOM/AutoPtr.h>
-#include <Poco/DOM/DOMWriter.h>
-#include <Poco/DOM/Document.h>
-#include <Poco/DOM/Element.h>
-#include <Poco/URI.h>
-#include <Poco/XML/XMLWriter.h>
 #include <fmt/chrono.h>
 #include <fmt/core.h>
 
-#include <algorithm>
 #include <boost/log/attributes/clock.hpp>
 #include <boost/log/core.hpp>
 #include <boost/log/sources/severity_logger.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/log/utility/setup/console.hpp>
 #include <chrono>
+#include <cstdio>
+#include <ctime>
 #include <iostream>
-#include <memory>
-#include <optional>
-#include <sstream>
-#include <stdexcept>
+#include "simpleio/message.hpp"
 #include <string>
-#include <utility>
-#include <vector>
 
-namespace siomsg = simpleio::messages;
+#include "taktile/constants.hpp"
 
 namespace taktile {
-
 void init_logger() {
   boost::log::core::get()->add_global_attribute(
       "TimeStamp", boost::log::attributes::local_clock());
@@ -44,190 +33,89 @@ void init_logger() {
                                       boost::log::trivial::debug);
 }
 
-URL::URL(std::string const& url) {
-  auto uri = parse_url(url);
-  scheme = uri.scheme;
-  net_loc = uri.net_loc;
-  port = uri.port;
+std::string TimeProvider::to_datetime(uint64_t milliseconds) {
+  auto tp_ms = std::chrono::time_point<std::chrono::system_clock,
+                                       std::chrono::milliseconds>(
+      std::chrono::milliseconds(milliseconds));
+  auto const seconds =
+      std::chrono::time_point_cast<std::chrono::seconds>(tp_ms);
+  auto const msec =
+      std::chrono::duration_cast<std::chrono::milliseconds>((tp_ms - seconds));
+  return fmt::format(W3C_XML_DATETIME, seconds, msec.count());
 }
 
-URL::URL(Scheme const& _scheme, std::string const& _net_loc, uint16_t _port) {
-  scheme = _scheme;
-  net_loc = _net_loc;
-  port = _port;
+std::optional<uint64_t> TimeProvider::from_datetime(
+    std::string const& datetime) {
+  static constexpr size_t DATETIME_COMPONENTS{7};
+  static constexpr int MIN_YEAR{1900};
+  int millis;
+  std::tm dtc = {};
+  if (sscanf(datetime.c_str(), "%d-%d-%dT%d:%d:%d.%dZ", &dtc.tm_year, &dtc.tm_mon,
+             &dtc.tm_mday, &dtc.tm_hour, &dtc.tm_min, &dtc.tm_sec, &millis) < DATETIME_COMPONENTS - 1) {
+    BOOST_LOG_TRIVIAL(error)
+        << "Could not parse datetime: " << datetime << std::endl;
+    return std::nullopt;
+  }
+
+  dtc.tm_year -= MIN_YEAR;
+  dtc.tm_mon -= 1;
+
+  time_t t_utc = timegm(&dtc);  // UTC
+  if (t_utc == -1) {
+    return std::nullopt;
+  }
+
+  uint64_t base_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::system_clock::from_time_t(t_utc).time_since_epoch())
+          .count();
+  return base_ms + millis;
 }
 
-URL URL::parse_url(std::string const& inp) {
-  // Parse the URL
-  Poco::URI uri{inp};
-
-  if (SCHEME_INV_MAP.find(uri.getScheme()) == SCHEME_INV_MAP.end()) {
-    throw std::invalid_argument("Invalid scheme: " + uri.getScheme());
-  }
-
-  auto scheme = SCHEME_INV_MAP.at(uri.getScheme());
-
-  if (uri.getSpecifiedPort() == 0) {
-    auto is_broadcast =
-        (uri.getScheme().find("broadcast") != std::string::npos);
-    auto is_write_only = (uri.getScheme().find("wo") != std::string::npos);
-    return URL{scheme, uri.getHost(),
-               is_broadcast || is_write_only ? DEFAULT_BROADCAST_PORT
-                                             : DEFAULT_COT_PORT};
-  }
-
-  return URL{scheme, uri.getHost(), uri.getSpecifiedPort()};
-}
-
-void CotType::validate(CotType const& cot) {
-  if (cot.lat < -LATITUDE_BOUND || cot.lat > LATITUDE_BOUND) {
-    throw std::invalid_argument("Latitude must be between -90 and 90 degrees");
-  }
-  if (cot.lon < -LONGITUDE_BOUND || cot.lon > LONGITUDE_BOUND) {
-    throw std::invalid_argument(
-        "Longitude must be between -180 and 180 degrees");
-  }
-  if (cot.ce < 0) {
-    throw std::invalid_argument(
-        "Circular Error must be greater than or equal to 0");
-  }
-  if (cot.hae < 0) {
-    throw std::invalid_argument(
-        "Height Above Ellipsoid must be greater than or equal to 0");
-  }
-  if (cot.le < 0) {
-    throw std::invalid_argument(
-        "Linear Error must be greater than or equal to 0");
-  }
-  if (cot.uid.empty()) {
-    throw std::invalid_argument("UID must not be empty");
-  }
-  if (cot.cot_type.empty()) {
-    throw std::invalid_argument("CoT type must not be empty");
-  }
-}
-
-CotType::CotType(std::string _uid)
-    : uid{std::move(_uid)},
-      stale{DEFAULT_COT_STALE},
-      cot_type{DEFAULT_COT_TYPE} {}
-
-std::string CotType::get_time(std::optional<int32_t> cot_stale) {
+/// @brief Static methods in TakData
+uint64_t TimeProvider::get_time(std::optional<uint64_t> cot_stale) {
   auto time = std::chrono::system_clock::now();
   if (cot_stale.has_value()) {
-    time += std::chrono::seconds(cot_stale.value());
+    time += std::chrono::milliseconds(cot_stale.value());
   }
-  auto const seconds = std::chrono::time_point_cast<std::chrono::seconds>(time);
   auto const milliseconds =
-      std::chrono::duration_cast<std::chrono::milliseconds>((time - seconds));
-  return fmt::format(W3C_XML_DATETIME, seconds, milliseconds.count());
+      std::chrono::time_point_cast<std::chrono::milliseconds>(time);
+  return milliseconds.time_since_epoch().count();
 }
 
-siomsg::XmlMessageType Cot2Xml::convert(CotType const& cot) {
-  // Create a local Document object
-  auto* doc = new Poco::XML::Document();
-
-  // Create <event> element
-  auto* event = doc->createElement("event");
-  event->setAttribute("version", "2.0");
-  event->setAttribute("type", cot.cot_type);
-  event->setAttribute("uid", cot.uid);
-  event->setAttribute("how", "m-g");
-  event->setAttribute("time", CotType::get_time());
-  event->setAttribute("start", CotType::get_time());
-  event->setAttribute("stale", CotType::get_time(cot.stale));
-
-  // Create <point> element
-  auto* point = doc->createElement("point");
-  point->setAttribute("lat", std::to_string(cot.lat));
-  point->setAttribute("lon", std::to_string(cot.lon));
-  point->setAttribute("le", std::to_string(cot.le));
-  point->setAttribute("hae", std::to_string(cot.hae));
-  point->setAttribute("ce", std::to_string(cot.ce));
-
-  // Create <_flow-tags_> element
-  auto* flow_tags = doc->createElement("_flow-tags_");
-  std::string _ft_tag = DEFAULT_HOST_ID + "-v" + std::string(VERSION);
-  std::replace(_ft_tag.begin(), _ft_tag.end(), '@', '-');
-  flow_tags->setAttribute(_ft_tag, CotType::get_time());
-
-  // Create <detail> element
-  auto* detail = doc->createElement("detail");
-  detail->appendChild(flow_tags);
-
-  event->appendChild(point);
-  event->appendChild(detail);
-
-  // Attach <event> to document
-  doc->appendChild(event);
-  return doc;
-}
-
-CotType Cot2Xml::convert(siomsg::XmlMessageType const& xml) {
-  // Get the <event> element
-  if (xml == nullptr) {
-    throw std::invalid_argument("XML message is null.");
+std::string Varint::encode(std::uint64_t payload_length) {
+  std::string out;
+  while (payload_length >= Varint::CONTINUE_BIT) {
+    out.push_back(static_cast<char>((payload_length & Varint::BIT_MASK) | Varint::CONTINUE_BIT));
+    payload_length >>= Varint::PAYLOAD_BITS_PER_BYTE;
   }
-  auto* event = xml->documentElement();
-  if (event == nullptr || event->nodeName() != "event") {
-    throw std::invalid_argument(
-        "Expected root-level <event> element not found.");
-  }
-
-  // Get the <point> element
-  auto* point = event->getChildElement("point");
-  if (point == nullptr) {
-    throw std::invalid_argument("Expected <point> element not found.");
-  }
-
-  // Get the <detail> element
-  // auto detail = event->getElementByTagName("detail");
-  // if (detail.isNull()) {
-  //  throw std::invalid_argument("No <detail> element found");
-  //}
-
-  auto uid = event->getAttribute("uid");
-  if (uid.empty()) {
-    throw std::invalid_argument("UID attribute is empty.");
-  }
-  auto cot = CotType(uid);
-
-  // Get the attributes
-  try {
-    cot.lat = std::stod(point->getAttribute("lat"));
-    cot.lon = std::stod(point->getAttribute("lon"));
-    cot.le = std::stod(point->getAttribute("le"));
-    cot.hae = std::stod(point->getAttribute("hae"));
-    cot.ce = std::stod(point->getAttribute("ce"));
-    cot.cot_type = event->getAttribute("type");
-    cot.stale = std::stoul(event->getAttribute("stale"));
-    CotType::validate(cot);
-    return cot;
-  } catch (std::invalid_argument const& e) {
-    throw std::invalid_argument("CoT validation failed: " +
-                                std::string(e.what()));
-  } catch (std::exception const& e) {
-    throw std::invalid_argument("Unable to parse: " + std::string(e.what()));
-  }
+  out.push_back(static_cast<char>(payload_length & Varint::BIT_MASK));
+  return out;
 }
 
-CotXmlSerializer::CotXmlSerializer(
-    std::shared_ptr<siomsg::XmlSerializer> strategy)
-    : xml_serializer_{std::move(strategy)} {}
-
-std::vector<std::byte> CotXmlSerializer::serialize(CotType const& entity) {
-  auto xml = Cot2Xml::convert(entity);
-  return xml_serializer_->serialize(xml);
+taktile::Varint::DecodeResult Varint::decode(std::string const& blob) {
+  uint64_t result = 0;
+  int32_t shift = 0;
+  size_t bytes_used = 0;
+  const auto *const front = blob.data();
+  while (bytes_used < blob.size()) {
+    auto const character = static_cast<uint8_t>(front[bytes_used++]);
+    uint64_t chunk = (character & Varint::BIT_MASK);
+    if (shift >= Varint::VARINT_SIZE_BITS || (chunk << shift >> shift) != chunk) {
+      throw simpleio::SerializerError("varint overflow");
+    }
+    result |= (chunk << shift);
+    if ((character & Varint::CONTINUE_BIT) == 0) {
+      return {result, bytes_used};
+    }
+    shift += Varint::PAYLOAD_BITS_PER_BYTE;
+    if (bytes_used > taktile::V1_PROTOCOL_MAX_VARINT_SIZE) {
+      std::stringstream s_str;
+      s_str << "varint too long: " << bytes_used;
+      throw simpleio::SerializerError(s_str.str());
+    }
+  }
+  throw simpleio::SerializerError("incomplete varint");
 }
 
-CotType CotXmlSerializer::deserialize(std::vector<std::byte> const& _blog) {
-  auto xml = xml_serializer_->deserialize(_blog);
-  return Cot2Xml::convert(xml);
-}
-
-CotType hello_event(std::optional<std::string> const& uid) {
-  auto cot = CotType(uid.value_or("takPing"));
-  cot.cot_type = "t-x-d-d";
-  return cot;
-}
 }  // namespace taktile

@@ -13,24 +13,31 @@ RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc | gpg --de
 RUN echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ jammy main" | tee /etc/apt/sources.list.d/kitware.list > /dev/null
 
 RUN apt-get update && apt-get install -y \
+   kitware-archive-keyring \
+   build-essential \
    clang-format \
    clang-tidy \
+   cmake \
    cppcheck \
    curl \
+   git \
+   protobuf-compiler \
    python3 \
    python3-pip \
-   git \
-   sudo \
-   build-essential \
-   kitware-archive-keyring \
-   cmake \
    libboost-all-dev \
    libfmt-dev \
-   libpoco-dev \
    libgtest-dev \
-   libmsgsl-dev \
+   libpoco-dev \
+   libprotobuf-dev \
    llvm \
+   nlohmann-json3-dev \
+   sudo \
    vim
+
+#RUN wget https://github.com/jwdinius/simpleio/releases/download/v0.1.0/simpleio-dev_0.1.0_arm64.deb \
+#COPY simpleio-dev_0.1.0_arm64.deb .
+#RUN apt install -y ./simpleio-dev_0.1.0_arm64.deb \
+#   && rm simpleio-dev_0.1.0_arm64.deb
 
 RUN python3 -m pip install pre-commit cpplint
 
