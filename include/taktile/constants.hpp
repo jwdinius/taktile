@@ -43,6 +43,11 @@ static const std::unordered_map<std::string, Scheme> SCHEME_INV_MAP{
     {"udp+wo", Scheme::UDP_WRITE_ONLY},
     {"log", Scheme::LOG}};  // NOLINT[whitespace/indent_namespace]
 
+// Helper for C-style string literal length (excluding null terminator)
+constexpr size_t cstr_len(const char* c_str) {
+    return sizeof(c_str) - 1;
+}
+
 static constexpr const char* DEFAULT_IPV4_ADDRESS{"239.2.3.1"};
 static constexpr uint16_t DEFAULT_BROADCAST_PORT{6969};
 static constexpr uint16_t DEFAULT_COT_PORT{8087};
@@ -58,13 +63,14 @@ static constexpr size_t MAX_UDP_BLOB_SIZE{1400};   // # of bytes
 static constexpr size_t MAX_TCP_BLOB_SIZE{64000};  // # of bytes
 static constexpr double LATITUDE_BOUND{90.0};      // degrees
 static constexpr double LONGITUDE_BOUND{180.0};    // degrees
-static constexpr std::array<const char*, 2> V0_PROTOCOL_PREFIXES{"<xml?", "<event"};
-static constexpr uint8_t V1_PROTOCOL_MAGIC{0xBF};
-static constexpr size_t V1_PROTOCOL_MAGIC_SIZE{1};
-static constexpr size_t V1_MESH_PROTOCOL_PREFIX_SIZE{3};
+static constexpr std::string_view V0_PROTOCOL_PREFIX{R"(<?xml version="1.0" encoding="UTF-8"?>)"};
+static constexpr std::string_view V0_PROTOCOL_SUFFIX{"</event>"};
+static constexpr const char V1_PROTOCOL_MAGIC = static_cast<const char>(0xBF);
 // NOLINTBEGIN(whitespace/indent_namespace)
-static constexpr std::array<uint8_t, V1_MESH_PROTOCOL_PREFIX_SIZE>
-    V1_MESH_PROTOCOL_PREFIX{V1_PROTOCOL_MAGIC, 0x01, V1_PROTOCOL_MAGIC};
+static constexpr const char V1_MESH_PROTOCOL_PREFIX_ARR[] = {
+    V1_PROTOCOL_MAGIC, 0x01, V1_PROTOCOL_MAGIC};
+static const std::string_view V1_MESH_PROTOCOL_PREFIX{
+    V1_MESH_PROTOCOL_PREFIX_ARR, sizeof(V1_MESH_PROTOCOL_PREFIX_ARR)};
 static constexpr size_t V1_PROTOCOL_MAX_VARINT_SIZE{
     10};  // From protobuf spec:
           // https://protobuf.dev/programming-guides/encoding/#varints, see

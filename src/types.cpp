@@ -27,166 +27,127 @@ namespace siomsg = simpleio::messages;
 
 namespace taktile {
  
-std::string serialize_v1_mesh(TakData const &entity, size_t max_blob_size) {
-  auto const& proto = entity.proto();
-  // 1) Serialize protobuf payload
-  std::string payload;
-  if (!proto.SerializeToString(&payload)) {
-    throw simpleio::SerializerError("Failed to serialize TakMessage to string.");
-  }
+TakDataFramer::TakDataFramer(ProtocolVersion framing_protocol)
+  : framing_protocol_{framing_protocol} {}
 
-  // 2) Prepend 0xBF 0x01 0xBF
-  std::string out;
-  out.reserve(V1_MESH_PROTOCOL_PREFIX.size() + payload.size());
-  out.append(reinterpret_cast<const char*>(V1_MESH_PROTOCOL_PREFIX.data()),
-             V1_MESH_PROTOCOL_PREFIX.size());
-  out += payload;
-  if (out.size() > max_blob_size) {
-    throw simpleio::SerializerError("Payload too large for mesh frame");
-  }
-  return out;
-}
-   
-TakData deserialize_v1_mesh(std::string const &blob) {
-  // Implement deserialization logic for V1_MESH
-   atakmap::commoncommo::protobuf::v1::TakMessage proto;
-   if (!proto.ParseFromArray(blob.data() + V1_MESH_PROTOCOL_PREFIX.size(),
-                              static_cast<int>(blob.size() - V1_MESH_PROTOCOL_PREFIX.size()))) {
-     throw simpleio::SerializerError("Failed to deserialize TakMessage from string.");
-   }
-  return TakData(proto);
-}
-
-std::string serialize_v1_stream(TakData const &entity, size_t max_blob_size) {
-   // 1) Serialize protobuf payload
-   auto const& proto = entity.proto();
-   std::string payload;
-   if (!proto.SerializeToString(&payload)) {
-     throw simpleio::SerializerError("Failed to serialize TakMessage to string.");
-   }
-
-   auto encoded_payload_length = Varint::encode(payload.size());
-
-   size_t const header = V1_PROTOCOL_MAGIC_SIZE + encoded_payload_length.size();
-   // (optional) enforce a max blob size for safety
-   if (payload.size() > max_blob_size - header) {
-     throw simpleio::SerializerError("Payload too large for stream frame");
-   }
-
-   // 2) Build frame: 0xBF <varint length> <payload>
-   std::string out(header + payload.size(), '\0');
-   out[0] = V1_PROTOCOL_MAGIC;
-   std::memcpy(out.data() + V1_PROTOCOL_MAGIC_SIZE, encoded_payload_length.data(), encoded_payload_length.size());
-   std::memcpy(out.data() + header, payload.data(), payload.size());
-
-   return out;
-}
-
-TakData deserialize_v1_stream(std::string const &blob, size_t max_blob_size) {
-   // 1) Validate magic
-   if (blob.size() < 2 || static_cast<unsigned char>(blob[0]) != V1_PROTOCOL_MAGIC) {
-     throw simpleio::SerializerError("Invalid TAK v1 stream header");
-   }
-
-   // 2) Read varint payload length
-   taktile::Varint::DecodeResult res{};
-   try {
-     res = Varint::decode(std::string(blob.data() + 1, blob.size() - 1));
-   } catch (std::exception const& e) {
-     throw simpleio::SerializerError(std::string("Failed to read stream length: ") + e.what());
-   }
-
-   size_t const header = V1_PROTOCOL_MAGIC_SIZE + res.bytes_used;
-   if (header + res.payload_length > blob.size()) {
-     throw simpleio::SerializerError("Incomplete TAK v1 stream frame");
-   }
-   if (res.payload_length > max_blob_size - header) {
-     throw simpleio::SerializerError("Stream payload exceeds maximum size");
-   }
-
-   // 3) Parse protobuf payload
-   atakmap::commoncommo::protobuf::v1::TakMessage proto;
-   if (!proto.ParseFromArray(blob.data() + header, static_cast<int>(res.payload_length))) {
-     throw simpleio::SerializerError("Failed to parse TakMessage from stream frame");
-   }
-
-   return TakData(proto);
-}
-
-ProtocolVersion extract_protocol(std::string const &blob) {
-   // 1) Check v1 MESH: 0xBF 0x01 0xBF
-   if (blob.size() >= V1_MESH_PROTOCOL_PREFIX.size() &&
-       std::memcmp(blob.data(),
-                   V1_MESH_PROTOCOL_PREFIX.data(),
-                   V1_MESH_PROTOCOL_PREFIX.size()) == 0) {
-     return ProtocolVersion::V1_MESH;
-   }
-
-   // 2) Check v1 STREAM: leading 0xBF (but not matching mesh above)
-   if (!blob.empty() && static_cast<char>(blob.front()) == V1_PROTOCOL_MAGIC) {
-     return ProtocolVersion::V1_STREAM;
-   }
-
-   // 3) Check if V0 XML.
-   if (blob.rfind(V0_PROTOCOL_PREFIXES[0], 0) == 0 || blob.rfind(V0_PROTOCOL_PREFIXES[1], 0) == 0) {
-     return ProtocolVersion::V0;
-   }
-
-   throw simpleio::SerializerError("Unknown protocol");
-}
-
-TakDataSerializerUdp::TakDataSerializerUdp(ProtocolVersion protocol)
-  : TakDataSerializer<MAX_UDP_BLOB_SIZE>(protocol) {}
-
-std::string TakDataSerializerUdp::serialize(TakData const& entity) {
-  switch(this->serialization_protocol_) {
+std::string TakDataFramer::frame(std::string const& entity_blob) const {
+  switch (framing_protocol_) {
     case ProtocolVersion::V1_MESH:
-      return serialize_v1_mesh(entity, MAX_UDP_BLOB_SIZE);
+      {
+        size_t const& header_size = V1_MESH_PROTOCOL_PREFIX.size();
+        std::string out(V1_MESH_PROTOCOL_PREFIX.size() + entity_blob.size(), '\0');
+        std::memcpy(out.data(), V1_MESH_PROTOCOL_PREFIX.data(), V1_MESH_PROTOCOL_PREFIX.size());
+        std::memcpy(out.data() + V1_MESH_PROTOCOL_PREFIX.size(), entity_blob.data(), entity_blob.size());
+        return out;
+      }
     case ProtocolVersion::V1_STREAM:
-      return serialize_v1_stream(entity, MAX_UDP_BLOB_SIZE);
+      {
+        auto const encoded_payload_length = Varint::encode(entity_blob.size());
+        size_t const header_size = 1 + encoded_payload_length.size();
+        std::string out(header_size + entity_blob.size(), '\0');
+        out[0] = V1_PROTOCOL_MAGIC;
+        std::memcpy(out.data() + 1, encoded_payload_length.data(), encoded_payload_length.size());
+        std::memcpy(out.data() + header_size, entity_blob.data(), entity_blob.size());
+        return out;
+      }
     case ProtocolVersion::V0:
-      return xml_serializer_.serialize(entity.xml());
+      {
+        std::string out = entity_blob;
+        out.insert(0, std::string(V0_PROTOCOL_PREFIX));
+        return out;
+      }
+    default:
+      break;
   }
   throw simpleio::SerializerError("Unknown protocol");
 }
 
-TakData TakDataSerializerUdp::deserialize(std::string const& blob) {
-  switch (extract_protocol(blob)) {
-    case ProtocolVersion::V1_MESH:
-      return deserialize_v1_mesh(blob);
-    case ProtocolVersion::V1_STREAM:
-      return deserialize_v1_stream(blob, MAX_UDP_BLOB_SIZE);
-    case ProtocolVersion::V0:
-      return TakData(xml_serializer_.deserialize(blob));
+bool TakDataFramer::try_unframe(std::string& buffer,
+                                std::string& entity_blob) const {
+  if (buffer.empty()) {
+    return false;
   }
-  throw simpleio::SerializerError("Unknown protocol");
-}
 
-TakDataSerializerTcp::TakDataSerializerTcp(ProtocolVersion protocol)
-  : TakDataSerializer<MAX_TCP_BLOB_SIZE>(protocol) {}
+  if (buffer.find(V1_MESH_PROTOCOL_PREFIX) != std::string::npos) {
+    // Implement deserialization logic for V1_MESH
+    auto prefix_pos = buffer.find(V1_MESH_PROTOCOL_PREFIX);
+    if (prefix_pos == std::string::npos) {
+        // Prefix not found, drop everything
+        buffer.clear();
+        return false;
+    }
 
-std::string TakDataSerializerTcp::serialize(TakData const& entity) {
-  switch(this->serialization_protocol_) {
-    case ProtocolVersion::V1_MESH:
-      return serialize_v1_mesh(entity, MAX_TCP_BLOB_SIZE);
-    case ProtocolVersion::V1_STREAM:
-      return serialize_v1_stream(entity, MAX_TCP_BLOB_SIZE);
-    case ProtocolVersion::V0:
-      return xml_serializer_.serialize(entity.xml());
+    // Drop everything before the prefix
+    if (prefix_pos > 0) {
+        buffer.erase(0, prefix_pos);
+    }
+
+    // Read until the next prefix or end of buffer
+    auto end_pos = buffer.find(V1_MESH_PROTOCOL_PREFIX, V1_MESH_PROTOCOL_PREFIX.size());
+    if (end_pos == std::string::npos) {
+        end_pos = buffer.size();
+    }
+
+    TakProto proto;
+    if (proto.ParseFromArray(buffer.data() + V1_MESH_PROTOCOL_PREFIX.size(),
+                             static_cast<int>(end_pos - V1_MESH_PROTOCOL_PREFIX.size()))) {
+      entity_blob = buffer.substr(V1_MESH_PROTOCOL_PREFIX.size(), end_pos);
+      buffer.erase(0, end_pos);
+      return true;
+    }
+    return false;
+  } else if (buffer.find(V0_PROTOCOL_PREFIX) != std::string::npos) {
+    // Implement deserialization logic for V0
+    auto prefix_pos = buffer.find(V0_PROTOCOL_PREFIX);
+    if (prefix_pos == std::string::npos) {
+        // Prefix not found, drop everything
+        buffer.clear();
+        return false;
+    }
+
+    // Drop everything before the prefix
+    if (prefix_pos > 0) {
+        buffer.erase(0, prefix_pos);
+    }
+
+    // Check if buffer contains a complete CoT message
+    if (buffer.find(V0_PROTOCOL_SUFFIX) == std::string::npos) {
+      return false;
+    }
+
+    // Extract the complete CoT message
+    auto end_pos = buffer.find(V0_PROTOCOL_SUFFIX) + V0_PROTOCOL_SUFFIX.size();
+    entity_blob = buffer.substr(V0_PROTOCOL_PREFIX.size(), end_pos);
+    buffer.erase(0, end_pos);
+    return true;
+  } else {
+    auto prefix_pos = buffer.find(&V1_PROTOCOL_MAGIC);
+    if (prefix_pos == std::string::npos) {
+        // Prefix not found, drop everything
+        buffer.clear();
+        return false;
+    }
+
+    // Drop everything before the prefix
+    if (prefix_pos > 0) {
+        buffer.erase(0, prefix_pos);
+    }
+
+    // 1) Read varint payload length
+    taktile::Varint::DecodeResult res{};
+    res = Varint::decode(std::string(buffer.data() + 1, buffer.data() + V1_PROTOCOL_MAX_VARINT_SIZE - 1));
+    size_t const header_size = 1 + res.bytes_used;
+
+    // 2) Parse protobuf payload
+    TakProto proto;
+    if (proto.ParseFromArray(buffer.data() + header_size, static_cast<int>(res.payload_length))) {
+      entity_blob = buffer.substr(header_size, res.payload_length);
+      buffer.erase(0, header_size + res.payload_length);
+      return true;
+    }
+    return false;
   }
-  throw simpleio::SerializerError("Unknown protocol");
-}
-
-TakData TakDataSerializerTcp::deserialize(std::string const& blob) {
-  switch (extract_protocol(blob)) {
-    case ProtocolVersion::V1_MESH:
-      return deserialize_v1_mesh(blob);
-    case ProtocolVersion::V1_STREAM:
-      return deserialize_v1_stream(blob, MAX_TCP_BLOB_SIZE);
-    case ProtocolVersion::V0:
-      return TakData(xml_serializer_.deserialize(blob));
-  }
-  throw simpleio::SerializerError("Unknown protocol");
+  return false;
 }
 
 TakData::TakData() {
@@ -221,7 +182,7 @@ TakData::TakData(std::string const& _uid) {
   make_xml();
 }
 
-TakData::TakData(atakmap::commoncommo::protobuf::v1::TakMessage proto)
+TakData::TakData(TakProto proto)
   : proto_(std::move(proto)) {
   make_xml();
 }
@@ -307,7 +268,6 @@ bool TakData::valid() {
   }
   return true;
 }
- 
 
 void TakData::make_xml() {
   // Create a local Document object
@@ -355,7 +315,7 @@ void TakData::make_xml() {
   xml_->appendChild(event);
 }
 
-atakmap::commoncommo::protobuf::v1::TakMessage TakData::proto() const {
+TakProto TakData::proto() const {
   return proto_;
 }
 

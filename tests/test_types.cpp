@@ -23,6 +23,20 @@ static inline auto contains_substring =
                  sub_str.end()) != str.end();
     };
 
+static inline auto starts_with =
+    [](std::string const& str,
+       std::string_view const& prefix) {
+      return str.size() >= prefix.size() &&
+             str.compare(0, prefix.size(), prefix) == 0;
+    };
+
+static inline auto ends_with =
+    [](std::string const& str,
+       std::string_view const& suffix) {
+      return str.size() >= suffix.size() &&
+             str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
+    };
+
 namespace sio = simpleio;
 namespace siomsg = sio::messages;
 
@@ -143,10 +157,117 @@ TEST(Types, TakData_ProtoFromHelloEvent) {
   }
 }
 
+TEST(Types, TakMessage_V0_SerializeAndDeserialize) {
+  // Create a TakData object (using the hello_event function)
+  auto hello_event = taktile::TakData::hello_event("taco");
+  auto serializer = std::make_shared<taktile::TakDataSerializerUdp>(true);
+  auto tak_msg =
+      std::make_shared<taktile::TakMessageUdp>(std::move(hello_event), serializer);
+  {
+    auto entity = tak_msg->entity();
+    EXPECT_EQ(entity.proto().cotevent().uid(), "taco");
+  }
+
+  // Copy the packed entity
+  std::string serialized_tak_msg{tak_msg->blob()};
+
+  auto tak_msg_from_serialized =
+      std::make_shared<taktile::TakMessageUdp>(std::move(serialized_tak_msg), serializer);
+
+  {
+    auto entity = tak_msg_from_serialized->entity();
+    EXPECT_EQ(entity.proto().cotevent().uid(), "taco");
+  }
+}
+
+TEST(Types, TakMessage_V0_FrameAndUnframe) {
+  // Create a TakData object (using the hello_event function)
+  auto hello_event = taktile::TakData::hello_event("taco");
+  auto serializer = std::make_shared<taktile::TakDataSerializerUdp>(true);
+  auto tak_msg =
+      std::make_shared<taktile::TakMessageUdp>(std::move(hello_event), serializer);
+  {
+    auto entity = tak_msg->entity();
+    EXPECT_EQ(entity.proto().cotevent().uid(), "taco");
+  }
+
+  // Copy the packed entity
+  std::string serialized_tak_msg{tak_msg->blob()};
+
+  // Frame the message
+  auto framer = std::make_shared<taktile::TakDataFramer>(taktile::ProtocolVersion::V0);
+  auto framed_msg = framer->frame(serialized_tak_msg);
+
+  // Check that the framed message contains the expected XML prefix and suffix
+  EXPECT_TRUE(starts_with(framed_msg, std::string(taktile::V0_PROTOCOL_PREFIX)));
+
+  // Check that the framed message contains the expected XML suffix
+  EXPECT_TRUE(ends_with(framed_msg, std::string(taktile::V0_PROTOCOL_SUFFIX)));
+
+  // Unframe the message
+  std::string buffer = framed_msg;
+  std::string entity_blob;
+  EXPECT_TRUE(framer->try_unframe(buffer, entity_blob));
+  EXPECT_EQ(buffer.size(), 0);
+  EXPECT_EQ(entity_blob, serialized_tak_msg);
+}
+
 TEST(Types, TakMessage_V1_Mesh_SerializeAndDeserialize) {
   // Create a TakData object (using the hello_event function)
   auto hello_event = taktile::TakData::hello_event("taco");
-  auto serializer = std::make_shared<taktile::TakDataSerializerTcp>(taktile::ProtocolVersion::V1_MESH);
+  auto serializer = std::make_shared<taktile::TakDataSerializerUdp>(false);
+  auto tak_msg =
+      std::make_shared<sio::Message<taktile::TakDataSerializerUdp>>(std::move(hello_event), serializer);
+  {
+    auto entity = tak_msg->entity();
+    EXPECT_EQ(entity.proto().cotevent().uid(), "taco");
+  }
+
+  // Copy the packed entity
+  std::string serialized_tak_msg{tak_msg->blob()};
+
+  auto tak_msg_from_serialized =
+      std::make_shared<sio::Message<taktile::TakDataSerializerUdp>>(std::move(serialized_tak_msg), serializer);
+
+  {
+    auto entity = tak_msg_from_serialized->entity();
+    EXPECT_EQ(entity.proto().cotevent().uid(), "taco");
+  }
+}
+
+TEST(Types, TakMessage_V1_MESH_FrameAndUnframe) {
+  // Create a TakData object (using the hello_event function)
+  auto hello_event = taktile::TakData::hello_event("taco");
+  auto serializer = std::make_shared<taktile::TakDataSerializerUdp>(false);
+  auto tak_msg =
+      std::make_shared<taktile::TakMessageUdp>(std::move(hello_event), serializer);
+  {
+    auto entity = tak_msg->entity();
+    EXPECT_EQ(entity.proto().cotevent().uid(), "taco");
+  }
+
+  // Copy the packed entity
+  std::string serialized_tak_msg{tak_msg->blob()};
+
+  // Frame the message
+  auto framer = std::make_shared<taktile::TakDataFramer>(taktile::ProtocolVersion::V1_MESH);
+  auto framed_msg = framer->frame(serialized_tak_msg);
+
+  // Check that the framed message contains the expected V1 mesh prefix and suffix
+  EXPECT_TRUE(starts_with(framed_msg, std::string(taktile::V1_MESH_PROTOCOL_PREFIX)));
+
+  // Unframe the message
+  std::string buffer = framed_msg;
+  std::string entity_blob;
+  EXPECT_TRUE(framer->try_unframe(buffer, entity_blob));
+  EXPECT_EQ(buffer.size(), 0);
+  EXPECT_EQ(entity_blob, serialized_tak_msg);
+}
+
+TEST(Types, TakMessage_V1_STREAM_SerializeAndDeserialize) {
+  // Create a TakData object (using the hello_event function)
+  auto hello_event = taktile::TakData::hello_event("taco");
+  auto serializer = std::make_shared<taktile::TakDataSerializerTcp>(false);
   auto tak_msg =
       std::make_shared<sio::Message<taktile::TakDataSerializerTcp>>(std::move(hello_event), serializer);
   {
@@ -156,7 +277,6 @@ TEST(Types, TakMessage_V1_Mesh_SerializeAndDeserialize) {
 
   // Copy the packed entity
   std::string serialized_tak_msg{tak_msg->blob()};
-  std::cout << serialized_tak_msg << std::endl;
 
   auto tak_msg_from_serialized =
       std::make_shared<sio::Message<taktile::TakDataSerializerTcp>>(std::move(serialized_tak_msg), serializer);
@@ -167,12 +287,12 @@ TEST(Types, TakMessage_V1_Mesh_SerializeAndDeserialize) {
   }
 }
 
-TEST(Types, TakMessage_V1_Stream_SerializeAndDeserialize) {
+TEST(Types, TakMessage_V1_STREAM_FrameAndUnframe) {
   // Create a TakData object (using the hello_event function)
   auto hello_event = taktile::TakData::hello_event("taco");
-  auto serializer = std::make_shared<taktile::TakDataSerializerUdp>(taktile::ProtocolVersion::V1_STREAM);
+  auto serializer = std::make_shared<taktile::TakDataSerializerUdp>(false);
   auto tak_msg =
-      std::make_shared<sio::Message<taktile::TakDataSerializerUdp>>(std::move(hello_event), serializer);
+      std::make_shared<taktile::TakMessageUdp>(std::move(hello_event), serializer);
   {
     auto entity = tak_msg->entity();
     EXPECT_EQ(entity.proto().cotevent().uid(), "taco");
@@ -180,15 +300,21 @@ TEST(Types, TakMessage_V1_Stream_SerializeAndDeserialize) {
 
   // Copy the packed entity
   std::string serialized_tak_msg{tak_msg->blob()};
-  std::cout << serialized_tak_msg << std::endl;
 
-  auto tak_msg_from_serialized =
-      std::make_shared<sio::Message<taktile::TakDataSerializerUdp>>(std::move(serialized_tak_msg), serializer);
+  // Frame the message
+  auto framer = std::make_shared<taktile::TakDataFramer>(taktile::ProtocolVersion::V1_STREAM);
+  auto framed_msg = framer->frame(serialized_tak_msg);
+  std::cout << "framed message size: " << framed_msg.size() << std::endl;
 
-  {
-    auto entity = tak_msg_from_serialized->entity();
-    EXPECT_EQ(entity.proto().cotevent().uid(), "taco");
-  }
+  // Check that the framed message contains the expected V1 mesh prefix and suffix
+  EXPECT_TRUE(starts_with(framed_msg, std::string(&taktile::V1_PROTOCOL_MAGIC)));
+
+  // Unframe the message
+  std::string buffer = framed_msg;
+  std::string entity_blob;
+  EXPECT_TRUE(framer->try_unframe(buffer, entity_blob));
+  EXPECT_EQ(buffer.size(), 0);
+  EXPECT_EQ(entity_blob, serialized_tak_msg);
 }
 
 int main(int argc, char** argv) {

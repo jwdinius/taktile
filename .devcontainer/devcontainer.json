@@ -30,14 +30,11 @@
     "vscode": {
       "extensions": [
         "ms-azuretools.vscode-docker",
-        "ms-python.python",
         "ms-vscode.cpptools",
         "ms-vscode.cpptools-extension-pack",
         "redhat.vscode-yaml",
         "streetsidesoftware.code-spell-checker",
         "twxs.cmake",
-        "yzhang.markdown-all-in-one",
-        "zachflower.uncrustify",
         "copilot.copilot"
       ]
     }
