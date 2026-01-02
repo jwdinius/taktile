@@ -20,6 +20,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          submodules: true
           fetch-depth: 0
 
       - name: Log in to GHCR
@@ -59,6 +60,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          submodules: true
           fetch-depth: 0
 
       - name: Log in to GHCR
@@ -71,7 +73,7 @@ jobs:
       - name: Run pre-commit
         run: |
           docker pull $IMAGE_NAME:$IMAGE_TAG
-          docker run --rm -u root -v ${{ github.workspace }}:/workspace -w /workspace $IMAGE_NAME:$IMAGE_TAG bash -c "
+          docker run --rm -u root -v ${{ github.workspace }}:/workspace -w /workspace -e GITHUB_ACTIONS=1 -e ATAK_CIV_DIR=/workspace/submodules/AndroidTacticalAssaultKit-CIV $IMAGE_NAME:$IMAGE_TAG bash -c "
             git config --global --add safe.directory /workspace && pre-commit run --all-files
           "
 
@@ -83,6 +85,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          submodules: true
           fetch-depth: 0
 
       - name: Log in to GHCR
@@ -95,7 +98,7 @@ jobs:
       - name: Build and run tests in devcontainer
         run: |
           docker pull $IMAGE_NAME:$IMAGE_TAG
-          docker run --rm -u root -v ${{ github.workspace }}:/workspace -w /workspace -e GITHUB_ACTIONS=1 $IMAGE_NAME:$IMAGE_TAG bash -c "
+          docker run --rm -u root -v ${{ github.workspace }}:/workspace -w /workspace -e GITHUB_ACTIONS=1 -e ATAK_CIV_DIR=/workspace/submodules/AndroidTacticalAssaultKit-CIV $IMAGE_NAME:$IMAGE_TAG bash -c "
             ./scripts/build && \
             ./scripts/test
           "
@@ -113,6 +116,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          submodules: true
           fetch-depth: 0
 
       - name: Log in to GHCR
@@ -131,7 +135,7 @@ jobs:
       - name: Run clang-tidy in devcontainer
         run: |
           docker pull $IMAGE_NAME:$IMAGE_TAG
-          docker run --rm -u root -v ${{ github.workspace }}:/workspace -w /workspace $IMAGE_NAME:$IMAGE_TAG bash -c "
+          docker run --rm -u root -v ${{ github.workspace }}:/workspace -w /workspace -e GITHUB_ACTIONS=1 -e ATAK_CIV_DIR=/workspace/submodules/AndroidTacticalAssaultKit-CIV $IMAGE_NAME:$IMAGE_TAG bash -c "
             ./scripts/analyze
           "
 
@@ -150,6 +154,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          submodules: true
           fetch-depth: 0
 
       - name: Log in to GHCR
@@ -167,7 +172,7 @@ jobs:
       - name: Build debian package
         run: |
           docker pull $IMAGE_NAME:$IMAGE_TAG
-          docker run --rm --platform linux/${{ matrix.arch }} -u root -v ${{ github.workspace }}:/workspace -w /workspace $IMAGE_NAME:$IMAGE_TAG bash -c "
+          docker run --rm --platform linux/${{ matrix.arch }} -u root -v ${{ github.workspace }}:/workspace -w /workspace -e GITHUB_ACTIONS=1 -e ATAK_CIV_DIR=/workspace/submodules/AndroidTacticalAssaultKit-CIV $IMAGE_NAME:$IMAGE_TAG bash -c "
               ./scripts/package
             "
 
