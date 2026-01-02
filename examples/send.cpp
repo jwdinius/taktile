@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 #include <filesystem>
 #include <iostream>
+#include <memory>
+#include <simpleio/transports/ip/ip.hpp>
+#include <string>
 
 #include "certs_path.h"  // NOLINT [build/include_subdir]
-
-#include <simpleio/transports/ip/ip.hpp>
 #include "taktile/taktile.hpp"
 
 /// Send CoT (i.e., TAK v0) messages over TCP or TLS
@@ -14,7 +15,7 @@
 ///
 /// This example is modeled after the pytak library's "send" example:
 /// https://pytak.readthedocs.io/en/latest/examples/#send-tak-data
-/// 
+///
 /// A "takPong" event is sent every 5 seconds. This requires a TAK server
 /// listening on the specified address/port using the specified protocol.
 /// You can run the example TAK server included with this library by running
@@ -23,7 +24,7 @@ namespace siotrnsip = simpleio::transports::ip;
 
 taktile::TakData tak_pong() {
   auto tak_msg = atakmap::commoncommo::protobuf::v1::TakMessage();
-  auto *cot = tak_msg.mutable_cotevent();
+  auto* cot = tak_msg.mutable_cotevent();
   cot->set_type("t-x-d-d");
   cot->set_uid("takPong");
   cot->set_how(taktile::DEFAULT_COT_HOW);
@@ -44,24 +45,32 @@ int main(int argc, char** argv) {
   auto protocol = std::string(argv[3]);
 
   auto serializer = std::make_shared<taktile::TakDataSerializerTcp>(true);
-  auto framer = std::make_shared<taktile::TakDataFramer>(taktile::ProtocolVersion::V0);
+  auto framer =
+      std::make_shared<taktile::TakDataFramer>(taktile::ProtocolVersion::V0);
 
   siotrnsip::Options options;
   if (protocol.compare("tcp") == 0) {
-    options = siotrnsip::TcpOptions{.endpoint = siotrnsip::Endpoint{
-        .ip = address, .port = port}, .streaming = true, .framer = framer};
+    options = siotrnsip::TcpOptions{
+        .endpoint = siotrnsip::Endpoint{.ip = address, .port = port},
+        .streaming = true,
+        .framer = framer};
   } else if (protocol.compare("tls") == 0) {
-    options = siotrnsip::TlsOptions{.tcp_options = siotrnsip::TcpOptions{
-      .endpoint = siotrnsip::Endpoint{.ip = address, .port = port}, .streaming = true, .framer = framer},
-      .credentials = siotrnsip::TlsCredentials{
+    options = siotrnsip::TlsOptions{
+        .tcp_options =
+            siotrnsip::TcpOptions{
+                .endpoint = siotrnsip::Endpoint{.ip = address, .port = port},
+                .streaming = true,
+                .framer = framer},
+        .credentials = siotrnsip::TlsCredentials{
             .ca_file = std::filesystem::path(CERTS_PATH) / "ca.crt",
             .cert_file = std::filesystem::path(CERTS_PATH) / "client.crt",
-            .key_file = std::filesystem::path(CERTS_PATH) / "private/client.key"}};
+            .key_file =
+                std::filesystem::path(CERTS_PATH) / "private/client.key"}};
   } else {
     std::cerr << "Unknown protocol: " << protocol << std::endl;
     return 1;
   }
-  
+
   auto context = std::make_unique<siotrnsip::Context>();
   auto sender = context->create_sender<taktile::TakMessageTcp>(options);
 

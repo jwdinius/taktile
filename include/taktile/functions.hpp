@@ -25,7 +25,7 @@ class Varint {
   static constexpr auto BIT_MASK = 0x7FU;
   static constexpr auto VARINT_SIZE_BITS = 64;
   static constexpr auto PAYLOAD_BITS_PER_BYTE = 7;
-  
+
   // Write unsigned varint (protobuf-compatible)
   static std::string encode(uint64_t payload_length);
 

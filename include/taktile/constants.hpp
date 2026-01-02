@@ -14,7 +14,7 @@ static constexpr const char* VERSION{"0.1.0"};
 
 // Helper for C-style string literal length (excluding null terminator)
 constexpr size_t cstr_len(const char* c_str) {
-    return sizeof(c_str) - 1;
+  return sizeof(c_str) - 1;
 }
 
 static constexpr const char* DEFAULT_IPV4_ADDRESS{"239.2.3.1"};
@@ -32,10 +32,11 @@ static constexpr size_t MAX_UDP_BLOB_SIZE{1400};   // # of bytes
 static constexpr size_t MAX_TCP_BLOB_SIZE{64000};  // # of bytes
 static constexpr double LATITUDE_BOUND{90.0};      // degrees
 static constexpr double LONGITUDE_BOUND{180.0};    // degrees
-static constexpr std::string_view V0_PROTOCOL_PREFIX{R"(<?xml version="1.0" encoding="UTF-8"?>)"};
+// NOLINTBEGIN
+static constexpr std::string_view V0_PROTOCOL_PREFIX{
+    R"(<?xml version="1.0" encoding="UTF-8"?>)"};
 static constexpr std::string_view V0_PROTOCOL_SUFFIX{"</event>"};
 static constexpr const char V1_PROTOCOL_MAGIC = static_cast<const char>(0xBF);
-// NOLINTBEGIN(whitespace/indent_namespace)
 static constexpr const std::array<char, 3> V1_MESH_PROTOCOL_PREFIX_ARR = {
     V1_PROTOCOL_MAGIC, 0x01, V1_PROTOCOL_MAGIC};
 static const std::string_view V1_MESH_PROTOCOL_PREFIX{
@@ -44,5 +45,5 @@ static constexpr size_t V1_PROTOCOL_MAX_VARINT_SIZE{
     10};  // From protobuf spec:
           // https://protobuf.dev/programming-guides/encoding/#varints, see
           // "Base 128 Varints" section
-// NOLINTEND(whitespace/indent_namespace)
+// NOLINTEND
 }  // namespace taktile

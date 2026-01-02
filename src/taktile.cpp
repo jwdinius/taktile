@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "taktile/taktile.hpp"
 
-#include <boost/log/trivial.hpp>
 #include <Poco/DOM/AutoPtr.h>
 #include <Poco/DOM/DOMWriter.h>
 #include <Poco/DOM/Document.h>
@@ -10,50 +9,53 @@
 #include <Poco/XML/XMLWriter.h>
 
 #include <algorithm>
+#include <boost/log/trivial.hpp>
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <simpleio/messages/xml.hpp>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include <simpleio/messages/xml.hpp>
-
 namespace siomsg = simpleio::messages;
 
 namespace taktile {
- 
+
 TakDataFramer::TakDataFramer(ProtocolVersion framing_protocol)
-  : framing_protocol_{framing_protocol} {}
+    : framing_protocol_{framing_protocol} {
+}  // NOLINT(whitespace/indent_namespace)
 
 std::string TakDataFramer::frame(std::string const& entity_blob) const {
   switch (framing_protocol_) {
-    case ProtocolVersion::V1_MESH:
-      {
-        size_t const& header_size = V1_MESH_PROTOCOL_PREFIX.size();
-        std::string out(V1_MESH_PROTOCOL_PREFIX.size() + entity_blob.size(), '\0');
-        std::memcpy(out.data(), V1_MESH_PROTOCOL_PREFIX.data(), V1_MESH_PROTOCOL_PREFIX.size());
-        std::memcpy(out.data() + V1_MESH_PROTOCOL_PREFIX.size(), entity_blob.data(), entity_blob.size());
-        return out;
-      }
-    case ProtocolVersion::V1_STREAM:
-      {
-        auto const encoded_payload_length = Varint::encode(entity_blob.size());
-        size_t const header_size = 1 + encoded_payload_length.size();
-        std::string out(header_size + entity_blob.size(), '\0');
-        out[0] = V1_PROTOCOL_MAGIC;
-        std::memcpy(out.data() + 1, encoded_payload_length.data(), encoded_payload_length.size());
-        std::memcpy(out.data() + header_size, entity_blob.data(), entity_blob.size());
-        return out;
-      }
-    case ProtocolVersion::V0:
-      {
-        std::string out = entity_blob;
-        out.insert(0, std::string(V0_PROTOCOL_PREFIX));
-        return out;
-      }
+    case ProtocolVersion::V1_MESH: {
+      size_t const& header_size = V1_MESH_PROTOCOL_PREFIX.size();
+      std::string out(V1_MESH_PROTOCOL_PREFIX.size() + entity_blob.size(),
+                      '\0');
+      std::memcpy(out.data(), V1_MESH_PROTOCOL_PREFIX.data(),
+                  V1_MESH_PROTOCOL_PREFIX.size());
+      std::memcpy(out.data() + V1_MESH_PROTOCOL_PREFIX.size(),
+                  entity_blob.data(), entity_blob.size());
+      return out;
+    }
+    case ProtocolVersion::V1_STREAM: {
+      auto const encoded_payload_length = Varint::encode(entity_blob.size());
+      size_t const header_size = 1 + encoded_payload_length.size();
+      std::string out(header_size + entity_blob.size(), '\0');
+      out[0] = V1_PROTOCOL_MAGIC;
+      std::memcpy(out.data() + 1, encoded_payload_length.data(),
+                  encoded_payload_length.size());
+      std::memcpy(out.data() + header_size, entity_blob.data(),
+                  entity_blob.size());
+      return out;
+    }
+    case ProtocolVersion::V0: {
+      std::string out = entity_blob;
+      out.insert(0, std::string(V0_PROTOCOL_PREFIX));
+      return out;
+    }
     default:
       break;
   }
@@ -70,25 +72,27 @@ bool TakDataFramer::try_unframe(std::string& buffer,
     // Implement deserialization logic for V1_MESH
     auto prefix_pos = buffer.find(V1_MESH_PROTOCOL_PREFIX);
     if (prefix_pos == std::string::npos) {
-        // Prefix not found, drop everything
-        buffer.clear();
-        return false;
+      // Prefix not found, drop everything
+      buffer.clear();
+      return false;
     }
 
     // Drop everything before the prefix
     if (prefix_pos > 0) {
-        buffer.erase(0, prefix_pos);
+      buffer.erase(0, prefix_pos);
     }
 
     // Read until the next prefix or end of buffer
-    auto end_pos = buffer.find(V1_MESH_PROTOCOL_PREFIX, V1_MESH_PROTOCOL_PREFIX.size());
+    auto end_pos =
+        buffer.find(V1_MESH_PROTOCOL_PREFIX, V1_MESH_PROTOCOL_PREFIX.size());
     if (end_pos == std::string::npos) {
-        end_pos = buffer.size();
+      end_pos = buffer.size();
     }
 
     TakProto proto;
-    if (proto.ParseFromArray(buffer.data() + V1_MESH_PROTOCOL_PREFIX.size(),
-                             static_cast<int>(end_pos - V1_MESH_PROTOCOL_PREFIX.size()))) {
+    if (proto.ParseFromArray(
+            buffer.data() + V1_MESH_PROTOCOL_PREFIX.size(),
+            static_cast<int>(end_pos - V1_MESH_PROTOCOL_PREFIX.size()))) {
       entity_blob = buffer.substr(V1_MESH_PROTOCOL_PREFIX.size(), end_pos);
       buffer.erase(0, end_pos);
       return true;
@@ -99,14 +103,14 @@ bool TakDataFramer::try_unframe(std::string& buffer,
     // Implement deserialization logic for V0
     auto prefix_pos = buffer.find(V0_PROTOCOL_PREFIX);
     if (prefix_pos == std::string::npos) {
-        // Prefix not found, drop everything
-        buffer.clear();
-        return false;
+      // Prefix not found, drop everything
+      buffer.clear();
+      return false;
     }
 
     // Drop everything before the prefix
     if (prefix_pos > 0) {
-        buffer.erase(0, prefix_pos);
+      buffer.erase(0, prefix_pos);
     }
 
     // Check if buffer contains a complete CoT message
@@ -123,24 +127,26 @@ bool TakDataFramer::try_unframe(std::string& buffer,
   if (buffer.find(&V1_PROTOCOL_MAGIC) != std::string::npos) {
     auto prefix_pos = buffer.find(&V1_PROTOCOL_MAGIC);
     if (prefix_pos == std::string::npos) {
-        // Prefix not found, drop everything
-        buffer.clear();
-        return false;
+      // Prefix not found, drop everything
+      buffer.clear();
+      return false;
     }
 
     // Drop everything before the prefix
     if (prefix_pos > 0) {
-        buffer.erase(0, prefix_pos);
+      buffer.erase(0, prefix_pos);
     }
 
     // 1) Read varint payload length
     taktile::Varint::DecodeResult res{};
-    res = Varint::decode(std::string(buffer.data() + 1, buffer.data() + V1_PROTOCOL_MAX_VARINT_SIZE - 1));
+    res = Varint::decode(std::string(
+        buffer.data() + 1, buffer.data() + V1_PROTOCOL_MAX_VARINT_SIZE - 1));
     size_t const header_size = 1 + res.bytes_used;
 
     // 2) Parse protobuf payload
     TakProto proto;
-    if (proto.ParseFromArray(buffer.data() + header_size, static_cast<int>(res.payload_length))) {
+    if (proto.ParseFromArray(buffer.data() + header_size,
+                             static_cast<int>(res.payload_length))) {
       entity_blob = buffer.substr(header_size, res.payload_length);
       buffer.erase(0, header_size + res.payload_length);
       return true;
@@ -151,7 +157,7 @@ bool TakDataFramer::try_unframe(std::string& buffer,
 }
 
 TakData::TakData() {
-  auto *cot_event = proto_.mutable_cotevent();
+  auto* cot_event = proto_.mutable_cotevent();
   // POPULATE Tak proto message
   auto const time = TimeProvider::get_time();
   auto const stale_time = TimeProvider::get_time(DEFAULT_COT_STALE);
@@ -167,7 +173,7 @@ TakData::TakData() {
 }
 
 TakData::TakData(std::string const& _uid) {
-  auto *cot_event = proto_.mutable_cotevent();
+  auto* cot_event = proto_.mutable_cotevent();
   auto const time = TimeProvider::get_time();
   auto const stale_time = TimeProvider::get_time(DEFAULT_COT_STALE);
   cot_event->set_uid(_uid);
@@ -182,19 +188,18 @@ TakData::TakData(std::string const& _uid) {
   make_xml();
 }
 
-TakData::TakData(TakProto proto)
-  : proto_(std::move(proto)) {
+TakData::TakData(TakProto proto) : proto_(std::move(proto)) {
   make_xml();
 }
 
 TakData::TakData(simpleio::messages::XmlMessageType xml)
-  : xml_(std::move(xml)) {
+    : xml_(std::move(xml)) {
   assert(xml_ != nullptr && "XML message must not be null");
-  auto *root = xml_->documentElement();
+  auto* root = xml_->documentElement();
   assert(root != nullptr && "Root element must not be null");
   assert(root->nodeName() == "event");
   assert(root->getAttribute("version") == "2.0");
-  auto *cot = proto_.mutable_cotevent();
+  auto* cot = proto_.mutable_cotevent();
   cot->set_type(root->getAttribute("type"));
   cot->set_uid(root->getAttribute("uid"));
   cot->set_how(root->getAttribute("how"));
@@ -202,16 +207,18 @@ TakData::TakData(simpleio::messages::XmlMessageType xml)
   if (sendtime.has_value()) {
     cot->set_sendtime(sendtime.value());
   }
-  auto const starttime = TimeProvider::from_datetime(root->getAttribute("start"));
+  auto const starttime =
+      TimeProvider::from_datetime(root->getAttribute("start"));
   if (starttime.has_value()) {
     cot->set_starttime(starttime.value());
   }
-  auto const staletime = TimeProvider::from_datetime(root->getAttribute("stale"));
+  auto const staletime =
+      TimeProvider::from_datetime(root->getAttribute("stale"));
   if (staletime.has_value()) {
     cot->set_staletime(staletime.value());
   }
 
-  auto *point_element = root->getChildElement("point");
+  auto* point_element = root->getChildElement("point");
   assert(point_element != nullptr && "Point element must not be null");
   cot->set_lat(std::stod(point_element->getAttribute("lat")));
   cot->set_lon(std::stod(point_element->getAttribute("lon")));
@@ -219,7 +226,7 @@ TakData::TakData(simpleio::messages::XmlMessageType xml)
   cot->set_hae(std::stod(point_element->getAttribute("hae")));
   cot->set_ce(std::stod(point_element->getAttribute("ce")));
 
-  auto *detail_element = root->getChildElement("detail");
+  auto* detail_element = root->getChildElement("detail");
   if (detail_element == nullptr) {
     // parse the detail element and convert to an xml string.
     Poco::XML::DOMWriter writer;
@@ -232,28 +239,29 @@ TakData::TakData(simpleio::messages::XmlMessageType xml)
 bool TakData::valid() {
   auto const& event = proto_.cotevent();
   if (event.lat() < -LATITUDE_BOUND || event.lat() > LATITUDE_BOUND) {
-    BOOST_LOG_TRIVIAL(error)
-        << "Invalid latitude: " << event.lat() << ". Must be between -90 and 90 degrees.";
+    BOOST_LOG_TRIVIAL(error) << "Invalid latitude: " << event.lat()
+                             << ". Must be between -90 and 90 degrees.";
     return false;
   }
   if (event.lon() < -LONGITUDE_BOUND || event.lon() > LONGITUDE_BOUND) {
-    BOOST_LOG_TRIVIAL(error)
-        << "Invalid longitude: " << event.lon() << ". Must be between -180 and 180 degrees.";
+    BOOST_LOG_TRIVIAL(error) << "Invalid longitude: " << event.lon()
+                             << ". Must be between -180 and 180 degrees.";
     return false;
   }
   if (event.ce() < 0) {
-    BOOST_LOG_TRIVIAL(error)
-        << "Invalid Circular Error: " << event.ce() << ". Must be greater than or equal to 0.";
+    BOOST_LOG_TRIVIAL(error) << "Invalid Circular Error: " << event.ce()
+                             << ". Must be greater than or equal to 0.";
     return false;
   }
   if (event.hae() < 0) {
     BOOST_LOG_TRIVIAL(error)
-        << "Invalid Height Above Ellipsoid: " << event.hae() << ". Must be greater than or equal to 0.";
+        << "Invalid Height Above Ellipsoid: " << event.hae()
+        << ". Must be greater than or equal to 0.";
     return false;
   }
   if (event.le() < 0) {
-    BOOST_LOG_TRIVIAL(error)
-        << "Invalid Linear Error: " << event.le() << ". Must be greater than or equal to 0.";
+    BOOST_LOG_TRIVIAL(error) << "Invalid Linear Error: " << event.le()
+                             << ". Must be greater than or equal to 0.";
     return false;
   }
   if (event.uid().empty()) {
@@ -295,7 +303,8 @@ void TakData::make_xml() {
   auto* flow_tags = xml_->createElement("_flow-tags_");
   std::string _ft_tag = DEFAULT_HOST_ID + "-v" + std::string(VERSION);
   std::replace(_ft_tag.begin(), _ft_tag.end(), '@', '-');
-  flow_tags->setAttribute(_ft_tag, TimeProvider::to_datetime(TimeProvider::get_time()));
+  flow_tags->setAttribute(_ft_tag,
+                          TimeProvider::to_datetime(TimeProvider::get_time()));
 
   // Create <detail> element
   auto* detail = xml_->createElement("detail");
@@ -325,7 +334,7 @@ siomsg::XmlMessageType TakData::xml() const {
 
 TakData TakData::hello_event(std::optional<std::string> const& uid) {
   auto tak_msg = atakmap::commoncommo::protobuf::v1::TakMessage();
-  auto *cot = tak_msg.mutable_cotevent();
+  auto* cot = tak_msg.mutable_cotevent();
   cot->set_uid(uid.value_or("takPing"));
   cot->set_type("t-x-d-d");
   return TakData(tak_msg);

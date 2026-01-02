@@ -14,9 +14,9 @@
 #include <cstdio>
 #include <ctime>
 #include <iostream>
-#include "simpleio/message.hpp"
 #include <string>
 
+#include "simpleio/message.hpp"
 #include "taktile/constants.hpp"
 
 namespace taktile {
@@ -50,8 +50,9 @@ std::optional<uint64_t> TimeProvider::from_datetime(
   static constexpr int MIN_YEAR{1900};
   int millis;
   std::tm dtc = {};
-  if (sscanf(datetime.c_str(), "%d-%d-%dT%d:%d:%d.%dZ", &dtc.tm_year, &dtc.tm_mon,
-             &dtc.tm_mday, &dtc.tm_hour, &dtc.tm_min, &dtc.tm_sec, &millis) < DATETIME_COMPONENTS - 1) {
+  if (sscanf(datetime.c_str(), "%d-%d-%dT%d:%d:%d.%dZ", &dtc.tm_year,
+             &dtc.tm_mon, &dtc.tm_mday, &dtc.tm_hour, &dtc.tm_min, &dtc.tm_sec,
+             &millis) < DATETIME_COMPONENTS - 1) {
     BOOST_LOG_TRIVIAL(error)
         << "Could not parse datetime: " << datetime << std::endl;
     return std::nullopt;
@@ -86,7 +87,8 @@ uint64_t TimeProvider::get_time(std::optional<uint64_t> cot_stale) {
 std::string Varint::encode(std::uint64_t payload_length) {
   std::string out;
   while (payload_length >= Varint::CONTINUE_BIT) {
-    out.push_back(static_cast<char>((payload_length & Varint::BIT_MASK) | Varint::CONTINUE_BIT));
+    out.push_back(static_cast<char>((payload_length & Varint::BIT_MASK) |
+                                    Varint::CONTINUE_BIT));
     payload_length >>= Varint::PAYLOAD_BITS_PER_BYTE;
   }
   out.push_back(static_cast<char>(payload_length & Varint::BIT_MASK));
@@ -97,11 +99,12 @@ taktile::Varint::DecodeResult Varint::decode(std::string const& blob) {
   uint64_t result = 0;
   int32_t shift = 0;
   size_t bytes_used = 0;
-  const auto *const front = blob.data();
+  const auto* const front = blob.data();
   while (bytes_used < blob.size()) {
     auto const character = static_cast<uint8_t>(front[bytes_used++]);
     uint64_t chunk = (character & Varint::BIT_MASK);
-    if (shift >= Varint::VARINT_SIZE_BITS || (chunk << shift >> shift) != chunk) {
+    if (shift >= Varint::VARINT_SIZE_BITS ||
+        (chunk << shift >> shift) != chunk) {
       throw simpleio::SerializerError("varint overflow");
     }
     result |= (chunk << shift);

@@ -1,4 +1,4 @@
-find_package(Protobuf 3.12 REQUIRED) 
+find_package(Protobuf 3.12 REQUIRED)
 
 set(ATAK_CIV_DIR $ENV{ATAK_CIV_DIR})
 
