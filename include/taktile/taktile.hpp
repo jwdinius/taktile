@@ -9,12 +9,11 @@
 #include <utility>
 #include <vector>
 
-#include <simpleio/message.hpp>
-#include <simpleio/messages/xml.hpp>
+#include "simpleio/message.hpp"
+#include "simpleio/messages/xml.hpp"
 #include "taktile/constants.hpp"
 #include "taktile/functions.hpp"
-/// TODO: put in protobuf subfolder: #include "protobuf/takmessage.pb.h"
-#include "takmessage.pb.h"
+#include "generated/takmessage.pb.h"
 
 namespace taktile {
 

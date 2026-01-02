@@ -8,8 +8,7 @@
 #include <regex>
 #include <string>
 
-#include "taktile/functions.hpp"
-#include "taktile/types.hpp"
+#include "taktile/taktile.hpp"
 
 /// Test that creating a CoT message with arbitrary UID returns the expected
 /// values.
@@ -190,7 +189,6 @@ TEST(Types, TakMessage_V0_FrameAndUnframe) {
     auto entity = tak_msg->entity();
     EXPECT_EQ(entity.proto().cotevent().uid(), "taco");
   }
-
   // Copy the packed entity
   std::string serialized_tak_msg{tak_msg->blob()};
 
@@ -304,7 +302,6 @@ TEST(Types, TakMessage_V1_STREAM_FrameAndUnframe) {
   // Frame the message
   auto framer = std::make_shared<taktile::TakDataFramer>(taktile::ProtocolVersion::V1_STREAM);
   auto framed_msg = framer->frame(serialized_tak_msg);
-  std::cout << "framed message size: " << framed_msg.size() << std::endl;
 
   // Check that the framed message contains the expected V1 mesh prefix and suffix
   EXPECT_TRUE(starts_with(framed_msg, std::string(&taktile::V1_PROTOCOL_MAGIC)));

@@ -1,8 +1,6 @@
 // Copyright (c) 2025, Joe Dinius, Ph.D.
 // SPDX-License-Identifier: Apache-2.0
-#include "taktile/constants.hpp"
-#include "taktile/functions.hpp"
-#include "taktile/types.hpp"
+#include "taktile/taktile.hpp"
 
 #include <boost/log/trivial.hpp>
 #include <Poco/DOM/AutoPtr.h>
@@ -96,7 +94,8 @@ bool TakDataFramer::try_unframe(std::string& buffer,
       return true;
     }
     return false;
-  } else if (buffer.find(V0_PROTOCOL_PREFIX) != std::string::npos) {
+  }
+  if (buffer.find(V0_PROTOCOL_PREFIX) != std::string::npos) {
     // Implement deserialization logic for V0
     auto prefix_pos = buffer.find(V0_PROTOCOL_PREFIX);
     if (prefix_pos == std::string::npos) {
@@ -120,7 +119,8 @@ bool TakDataFramer::try_unframe(std::string& buffer,
     entity_blob = buffer.substr(V0_PROTOCOL_PREFIX.size(), end_pos);
     buffer.erase(0, end_pos);
     return true;
-  } else {
+  }
+  if (buffer.find(&V1_PROTOCOL_MAGIC) != std::string::npos) {
     auto prefix_pos = buffer.find(&V1_PROTOCOL_MAGIC);
     if (prefix_pos == std::string::npos) {
         // Prefix not found, drop everything

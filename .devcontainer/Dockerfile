@@ -34,12 +34,12 @@ RUN apt-get update && apt-get install -y \
    sudo \
    vim
 
-#RUN wget https://github.com/jwdinius/simpleio/releases/download/v0.1.0/simpleio-dev_0.1.0_arm64.deb \
-#COPY simpleio-dev_0.1.0_arm64.deb .
-#RUN apt install -y ./simpleio-dev_0.1.0_arm64.deb \
-#   && rm simpleio-dev_0.1.0_arm64.deb
+RUN ARCH=$(dpkg --print-architecture) \
+   && wget https://github.com/jwdinius/simpleio/releases/download/v0.2.0/simpleio-dev_0.2.0_${ARCH}.deb \
+   && apt-get install -y ./simpleio-dev_0.2.0_${ARCH}.deb \
+   && rm simpleio-dev_0.2.0_${ARCH}.deb
 
-RUN python3 -m pip install pre-commit cpplint
+RUN python3 -m pip install pre-commit cpplint taky
 
 # setup user env at the end
 # -m option creates a fake writable home folder
@@ -49,15 +49,3 @@ RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
 USER taktile
 WORKDIR /home/taktile
-
-# Install pytak from source
-COPY submodules /tmp/submodules
-
-USER root
-RUN chown -R taktile:taktile /tmp/submodules
-
-USER taktile
-RUN python3 -m pip install /tmp/submodules/pytak
-RUN python3 -m pip install -r /tmp/submodules/pytak/requirements_test.txt
-
-RUN echo "export PATH=$HOME/.local/bin:$PATH" >> /home/taktile/.bashrc

@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# --- Configurable variables ---
+BASE_DIR="/workspaces/taktile/examples/taky"
+SSL_DIR="/workspaces/taktile/examples/certs"
+TLS_CONFIG="$BASE_DIR/taky_ssl.cfg"
+P12_PASS="atakatak"
+
+# --- Argument parsing ---
+MODE="${1:-}"
+if [[ "$MODE" != "tcp" && "$MODE" != "tls" ]]; then
+  echo "Usage: $0 {tcp|tls}"
+  exit 1
+fi
+
+# --- Ensure SSL materials exist (for TLS mode only) ---
+generate_ssl() {
+  echo "[*] Generating self-signed SSL materials in $SSL_DIR..."
+  mkdir -p "$SSL_DIR/private"
+  cd "$SSL_DIR"
+
+  # Skip if already exists
+  if [[ -f server.crt && -f private/server.key && -f ca.crt && -f client.crt ]]; then
+    echo "[*] SSL materials already exist, skipping generation."
+    return
+  fi
+
+  # Create CA
+  openssl genrsa -out private/ca.key 4096
+  openssl req -x509 -new -nodes -key private/ca.key -sha256 -days 3650 \
+    -subj "/C=US/ST=CA/L=Dev/O=TakyTest/OU=CA/CN=Taky-CA" \
+    -out ca.crt
+
+  # Create server cert/key
+  openssl genrsa -out private/server.key 2048
+  openssl req -new -key private/server.key \
+    -subj "/C=US/ST=CA/L=Dev/O=TakyTest/OU=Server/CN=taky-server" \
+    -out server.csr
+  echo "subjectAltName = DNS:taky-server,IP:127.0.0.1" > san.ext
+  openssl x509 -req -in server.csr -CA ca.crt -CAkey private/ca.key \
+    -CAcreateserial -out server.crt -days 825 -sha256 -extfile san.ext
+
+  # Create PKCS#12 bundle
+  openssl pkcs12 -export \
+    -inkey private/server.key -in server.crt -certfile ca.crt \
+    -name "Taky Server Certificate" \
+    -passout pass:${P12_PASS} -out server.p12
+
+  # Create client cert/key
+  openssl genrsa -out private/client.key 2048
+  openssl req -new -key private/client.key \
+    -subj "/C=US/ST=CA/L=Dev/O=TakyTest/OU=Client/CN=taky-client" \
+    -out client.csr
+  openssl x509 -req -in client.csr -CA ca.crt -CAkey private/ca.key \
+    -CAcreateserial -out client.crt -days 825 -sha256
+  openssl pkcs12 -export -inkey private/client.key -in client.crt -certfile ca.crt \
+    -name "Taky Client Certificate" -passout pass:${P12_PASS} -out client.p12
+
+  echo "[*] SSL materials generated:"
+  ls -l "$SSL_DIR"
+}
+
+# --- Ensure taky_ssl.cfg exists ---
+generate_tls_config() {
+  if [[ -f "$TLS_CONFIG" ]]; then
+    echo "[*] TLS config already exists at $TLS_CONFIG"
+    return
+  fi
+
+  echo "[*] Writing TLS config to $TLS_CONFIG..."
+  cat > "$TLS_CONFIG" <<EOF
+[taky]
+root_dir = $BASE_DIR
+[ssl]
+enabled = true
+client_cert_required = true
+ca = $SSL_DIR/ca.crt
+ca_key = $SSL_DIR/private/ca.key
+server_p12 = $SSL_DIR/server.p12
+server_p12_pw = ${P12_PASS}
+cert = $SSL_DIR/server.crt
+key = $SSL_DIR/private/server.key
+EOF
+}
+
+# --- Launch logic ---
+if [[ "$MODE" == "tcp" ]]; then
+  echo "[*] Launching Taky in TCP mode..."
+  exec taky -l debug
+else
+  echo "[*] Launching Taky in TLS mode..."
+  generate_ssl
+  generate_tls_config
+  exec taky -l debug -c "$TLS_CONFIG"
+fi

@@ -1,10 +1,8 @@
-# Specify the source files
 target_sources(${PROJECT_NAME}
   PRIVATE
     constants.cpp
     functions.cpp
-    types.cpp
-    url.cpp
+    taktile.cpp
 )
 
 target_link_libraries(${PROJECT_NAME}

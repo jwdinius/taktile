@@ -4,8 +4,7 @@ target_sources(${PROJECT_NAME}
     FILES
       taktile/constants.hpp
       taktile/functions.hpp
-      taktile/types.hpp
-      taktile/url.hpp
+      taktile/taktile.hpp
 )
 
 target_link_libraries(${PROJECT_NAME}
