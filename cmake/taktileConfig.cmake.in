@@ -1,0 +1,13 @@
+@PACKAGE_INIT@
+
+set(taktile_VERSION "@PROJECT_VERSION@")
+
+include(CMakeFindDependencyMacro)
+find_dependency(Boost 1.74 REQUIRED COMPONENTS system log log_setup)
+find_dependency(Poco 1.11 REQUIRED COMPONENTS Net XML)
+find_dependency(simpleio 0.2 REQUIRED)
+
+include("${CMAKE_CURRENT_LIST_DIR}/taktileTargets.cmake")
+
+add_library(taktile::taktile ALIAS taktile)
+add_library(taktile::takproto ALIAS takproto)

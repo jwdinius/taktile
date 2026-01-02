@@ -13,7 +13,7 @@
 #include "simpleio/messages/xml.hpp"
 #include "taktile/constants.hpp"
 #include "taktile/functions.hpp"
-#include "generated/takmessage.pb.h"
+#include "takproto/takmessage.pb.h"
 
 namespace taktile {
 
