@@ -4,10 +4,13 @@ target_sources(${PROJECT_NAME}
     FILES
       taktile/constants.hpp
       taktile/functions.hpp
+      taktile/taktile.hpp
 )
 
 target_link_libraries(${PROJECT_NAME}
   PUBLIC
     Boost::system
+    simpleio::base
     simpleio::messages::xml
+    ${PROJECT_NAME}::takproto
 )

@@ -1,8 +1,4 @@
-[submodule "submodules/pytak"]
-	path = submodules/pytak
-	url = git@github.com:jwdinius/pytak.git
-	branch = resolve-issues-with-tests
-[submodule "submodules/simpleio"]
-	path = submodules/simpleio
-	url = git@github.com:jwdinius/simpleio.git
-	branch = main
+[submodule "submodules/AndroidTacticalAssaultKit-CIV"]
+	path = submodules/AndroidTacticalAssaultKit-CIV
+	url = git@github.com:deptofdefense/AndroidTacticalAssaultKit-CIV.git
+	branch = 4.6.0.5

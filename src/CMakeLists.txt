@@ -1,12 +1,13 @@
-# Specify the source files
 target_sources(${PROJECT_NAME}
   PRIVATE
     constants.cpp
-    functions.cpp  # List all your source files here
+    functions.cpp
+    taktile.cpp
 )
 
 target_link_libraries(${PROJECT_NAME}
   PRIVATE
+    fmt
     Boost::log
     Boost::log_setup
 )

@@ -1,2 +1,6 @@
-build
+./build
 .vscode/settings.json
+examples/certs
+_CPack_Packages
+package-root
+taktile*.deb

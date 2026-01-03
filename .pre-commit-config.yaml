@@ -16,12 +16,5 @@ repos:
       - id: cpplint
         args: [
           "--linelength=80",
-          "--filter=+whitespace/indent,-build/include_order,-build/c++17,-whitespace/indent_namespace"
-        ]
-      - id: cppcheck
-        args: [
-          "--enable=all",
-          "--std=c++17",
-          "--inline-suppr",
-          "--template=gcc"
+          "--filter=+whitespace/indent,-build/include_order,-build/c++17"
         ]

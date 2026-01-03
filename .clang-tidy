@@ -9,5 +9,5 @@ Checks: >
   google-*,
   -google-runtime-references
 WarningsAsErrors: '*'
-HeaderFilterRegex: '.*'
+HeaderFilterRegex: '^(?!.*\.pb\.h$).*$'
 FormatStyle:     none

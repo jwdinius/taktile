@@ -22,25 +22,19 @@
     "DISPLAY": "${localEnv:DISPLAY}", // Needed for GUI try ":0" for windows
     "WAYLAND_DISPLAY": "${localEnv:WAYLAND_DISPLAY}",
     "XDG_RUNTIME_DIR": "${localEnv:XDG_RUNTIME_DIR}",
-    "LIBGL_ALWAYS_SOFTWARE": "1" // Needed for software rendering of opengl
+    "LIBGL_ALWAYS_SOFTWARE": "1",  // Needed for software rendering of opengl
+    "ATAK_CIV_DIR": "${containerWorkspaceFolder}/submodules/AndroidTacticalAssaultKit-CIV"
   },
   // Set *default* container specific settings.json values on container create.
   "customizations": {
     "vscode": {
       "extensions": [
-        "althack.ament-task-provider",
-        "betwo.b2-catkin-tools",
         "ms-azuretools.vscode-docker",
-        "ms-iot.vscode-ros",
-        "ms-python.python",
         "ms-vscode.cpptools",
         "ms-vscode.cpptools-extension-pack",
         "redhat.vscode-yaml",
-        "smilerobotics.urdf",
         "streetsidesoftware.code-spell-checker",
         "twxs.cmake",
-        "yzhang.markdown-all-in-one",
-        "zachflower.uncrustify",
         "copilot.copilot"
       ]
     }

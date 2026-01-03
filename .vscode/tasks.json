@@ -4,12 +4,7 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Run pytak unit tests",
-            "type": "shell",
-            "command": "pytest submodules/pytak/tests",
-        },
-        {
-            "label": "Build taktile",
+            "label": "Build",
             "type": "shell",
             "command": "./scripts/build",
             "group": {
@@ -20,10 +15,10 @@
             ]
         },
         {
-            "label": "Run taktile tests",
+            "label": "Test",
             "type": "shell",
             "command": "./scripts/test",
-            "dependsOn": ["Build taktile"],
+            "dependsOn": ["Build"],
             "group": {
                 "kind": "test",
                 "isDefault": true
@@ -33,13 +28,113 @@
             ]
         },
         {
-            "label": "Run clang-tidy",
+            "label": "Analyze",
             "type": "shell",
             "command": "./scripts/analyze",
-            "dependsOn": ["Run taktile tests"],
+            "dependsOn": ["Test"],
             "problemMatcher": [
                 "$gcc"
             ]
         },
+        {
+            "label": "Run taky server (TCP)",
+            "type": "shell",
+            "command": "./examples/taky/run_taky tcp",
+        },
+        {
+            "label": "Run send (TCP)",
+            "type": "shell",
+            "command": "./build/examples/send 127.0.0.1 8087 tcp",
+            "dependsOn": ["Build"],
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "Run taky server (TLS)",
+            "type": "shell",
+            "command": "./examples/taky/run_taky tls",
+        },
+        {
+            "label": "Run send (TLS)",
+            "type": "shell",
+            "command": "./build/examples/send 127.0.0.1 8089 tls",
+            "dependsOn": ["Build"],
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "Run UDP send and receive (v0)",
+            "type": "shell",
+            "command": "./build/examples/send_receive 127.0.0.1 9095 udp v0",
+            "dependsOn": ["Build"],
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "Run UDP send and receive (v1_mesh)",
+            "type": "shell",
+            "command": "./build/examples/send_receive 127.0.0.1 9095 udp v1_mesh",
+            "dependsOn": ["Build"],
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "Run TCP send and receive (v0)",
+            "type": "shell",
+            "command": "./build/examples/send_receive 127.0.0.1 9097 tcp v0",
+            "dependsOn": ["Build"],
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "Run TCP send and receive (v1_mesh)",
+            "type": "shell",
+            "command": "./build/examples/send_receive 127.0.0.1 9097 tcp v1_mesh",
+            "dependsOn": ["Build"],
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "Run TCP send and receive (v1_stream)",
+            "type": "shell",
+            "command": "./build/examples/send_receive 127.0.0.1 9097 tcp v1_stream",
+            "dependsOn": ["Build"],
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "Run TLS send and receive (v0)",
+            "type": "shell",
+            "command": "./build/examples/send_receive 127.0.0.1 9099 tls v0",
+            "dependsOn": ["Build"],
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "Run TLS send and receive (v1_mesh)",
+            "type": "shell",
+            "command": "./build/examples/send_receive 127.0.0.1 9099 tls v1_mesh",
+            "dependsOn": ["Build"],
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "Run TLS send and receive (v1_stream)",
+            "type": "shell",
+            "command": "./build/examples/send_receive 127.0.0.1 9099 tls v1_stream",
+            "dependsOn": ["Build"],
+            "problemMatcher": [
+                "$gcc"
+            ]
+        }
     ]
 }
